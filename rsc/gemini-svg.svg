@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- Градієнт фону -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a2e37"/>
+      <stop offset="100%" stop-color="#1e2229"/>
+    </linearGradient>
+    <!-- Градієнт для акценту (нейромережа /llama) -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3daee9"/>
+      <stop offset="100%" stop-color="#9370db"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Зовнішній округлений квадрат (іконка додатку) -->
+  <rect x="8" y="8" width="112" height="112" rx="24" ry="24" fill="url(#bgGrad)" stroke="#3daee9" stroke-width="3" stroke-opacity="0.4"/>
+
+  <!-- Термінальні риски зліва (символ консолі/лаунчера) -->
+  <text x="24" y="44" font-family="monospace" font-weight="bold" font-size="28" fill="#3daee9">&gt;_</text>
+
+  <!-- Стилізована літера 'L' або векторна мережа LLM -->
+  <path d="M36 72 L54 90 L92 50" fill="none" stroke="url(#accentGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Вузли нейромережі (крапки) -->
+  <circle cx="36" cy="72" r="5" fill="#3daee9"/>
+  <circle cx="54" cy="90" r="5" fill="#7b68ee"/>
+  <circle cx="92" cy="50" r="6" fill="#9370db"/>
+</svg>
