@@ -55,6 +55,7 @@ private:
     QTimer *m_healthTimer;
     QString m_currentStatus;
     QString m_currentModel;
+    int m_currentPort = 8080;
     bool m_isQuitting = false;
 
     void setupSystemTray();

@@ -15,6 +15,8 @@ Key Features
         Support for Context Shift (--context-shift) to handle infinite text generation efficiently.
         Option to disable the built-in Web UI to save system resources.
         Integrated log viewer to monitor the server's output in real-time.
+        Configurable server port (also used for the health check).
+        Extra Arguments field for any other llama-server flags (e.g. --jinja -fa on --temp 0.7), appended last so they can override defaults.
 
 Technical Stack
 
@@ -52,6 +54,6 @@ How to Use
     Browse for your model file (.gguf).
     Enable Auto for Context Size and GPU Layers to let the launcher find the optimal settings.
     Click Start Llama Server.
-    By default, the server will be accessible at http://127.0.0.1:8080.
+    By default, the server will be accessible at http://127.0.0.1:8080 (change the port in the Port field).
 
 This project leverages the power of the llama.cpp HTTP server.
