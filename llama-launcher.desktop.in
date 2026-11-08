@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Llama Launcher
+GenericName=LLM Server Interface
+Comment=GUI for running local LLM models via llama-server
+Comment[uk]=Графічний інтерфейс для запуску локальних мовних моделей через llama-server
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/Llama-launcher
+Icon=llama-launcher
+Type=Application
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=Llama-launcher

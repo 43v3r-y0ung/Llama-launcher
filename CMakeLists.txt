@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(Llama-launcher LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network LinguistTools)
 
 set(CMAKE_AUTORCC ON)
 qt_standard_project_setup()
@@ -12,7 +12,16 @@ qt_add_executable(Llama-launcher
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    gguf.cpp
+    gguf.h
     resources.qrc
+)
+
+# Ukrainian UI translation, compiled and embedded under :/i18n
+qt_add_translations(Llama-launcher
+    TS_FILES translations/llama-launcher_uk.ts
+    RESOURCE_PREFIX /i18n
+    LUPDATE_OPTIONS -no-obsolete
 )
 
 target_link_libraries(Llama-launcher
@@ -22,15 +31,18 @@ target_link_libraries(Llama-launcher
         Qt::Network
 )
 
+include(GNUInstallDirs)
+
 install(TARGETS Llama-launcher
-    BUNDLE  DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET Llama-launcher
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
+# Desktop integration (XDG): icon + menu entry pointing at the installed binary.
+install(FILES rsc/gemini-svg.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME llama-launcher.svg
 )
-install(SCRIPT ${deploy_script})
+configure_file(llama-launcher.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)

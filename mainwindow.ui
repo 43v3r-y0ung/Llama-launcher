@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" ?>
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>683</height>
+    <width>820</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,166 +16,515 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <layout class="QGridLayout" name="gridLayout">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>Model Path:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="modelPathEdit"/>
-      </item>
-      <item row="0" column="2">
-       <widget class="QPushButton" name="browseButton">
-        <property name="text">
-         <string>Browse...</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Context Size:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
-        <item>
-         <widget class="QComboBox" name="contextSizeCombo">
-          <property name="editable">
-           <bool>true</bool>
-          </property>
-          <item>
-           <property name="text">
-            <string>4096</string>
+     <widget class="QGroupBox" name="serverGroup">
+      <property name="title">
+       <string>Server</string>
+      </property>
+      <layout class="QGridLayout" name="serverGrid">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelServer">
+         <property name="text">
+          <string>llama-server:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="serverPathEdit">
+         <property name="placeholderText">
+          <string>llama-server (from PATH)</string>
+         </property>
+         <property name="toolTip">
+          <string>Path to the llama-server executable. Leave empty to use the one found in PATH.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="serverBrowseButton">
+         <property name="text">
+          <string>Browse...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1" colspan="2">
+        <widget class="QLabel" name="serverVersionLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextInteractionFlag::TextSelectableByMouse</set>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelDevice">
+         <property name="text">
+          <string>Device:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="deviceCombo">
+         <property name="toolTip">
+          <string>Device used for offloading (passed as --device). "All GPUs" lets llama-server split the model across every detected device, which is usually slower when one of them is an integrated GPU.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QPushButton" name="refreshDevicesButton">
+         <property name="text">
+          <string>Refresh</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Port:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <layout class="QHBoxLayout" name="portLayout" stretch="0,1">
+         <item>
+          <widget class="QSpinBox" name="portSpin">
+           <property name="minimum">
+            <number>1</number>
            </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>8192</string>
+           <property name="maximum">
+            <number>65535</number>
            </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>16384</string>
+           <property name="value">
+            <number>8080</number>
            </property>
-          </item>
-          <item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="noUiCheck">
            <property name="text">
-            <string>32768</string>
+            <string>Disable Web UI</string>
            </property>
-          </item>
-          <item>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelNetwork">
+         <property name="text">
+          <string>Network:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <layout class="QHBoxLayout" name="networkLayout" stretch="0,0,1">
+         <item>
+          <widget class="QCheckBox" name="lanAccessCheck">
            <property name="text">
-            <string>65536</string>
+            <string>Allow access from local network</string>
            </property>
-          </item>
-          <item>
+           <property name="toolTip">
+            <string>Listen on all network interfaces (--host 0.0.0.0) so other computers on your network can use the server.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelApiKey">
            <property name="text">
-            <string>131072</string>
+            <string>API key:</string>
            </property>
-          </item>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="contextAutoCheck">
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="apiKeyEdit">
+           <property name="echoMode">
+            <enum>QLineEdit::EchoMode::PasswordEchoOnEdit</enum>
+           </property>
+           <property name="placeholderText">
+            <string>none</string>
+           </property>
+           <property name="toolTip">
+            <string>Clients must send this key (Authorization: Bearer &lt;key&gt;; the Web UI asks for it in its settings). Leave empty for no key.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="4" column="2">
+        <widget class="QPushButton" name="generateKeyButton">
+         <property name="text">
+          <string>Generate</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QLabel" name="networkHintLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="modelGroup">
+      <property name="title">
+       <string>Model</string>
+      </property>
+      <layout class="QGridLayout" name="modelGrid">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelModelsDir">
+         <property name="text">
+          <string>Models folder:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="modelsDirEdit">
+         <property name="placeholderText">
+          <string>Folder scanned for .gguf files</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="modelsDirButton">
+         <property name="text">
+          <string>Choose...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Model:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="modelCombo">
+         <property name="toolTip">
+          <string>Models found in the models folder plus recently used ones. Settings below are remembered per model.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QPushButton" name="browseButton">
+         <property name="text">
+          <string>Browse...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1" colspan="2">
+        <widget class="QLabel" name="modelInfoLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1" colspan="2">
+        <widget class="QLabel" name="fitWarningLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="paramsGroup">
+      <property name="title">
+       <string>Parameters (remembered per model)</string>
+      </property>
+      <layout class="QGridLayout" name="paramsGrid">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Context Size:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <layout class="QHBoxLayout" name="contextLayout" stretch="1,0">
+         <item>
+          <widget class="QComboBox" name="contextSizeCombo">
+           <property name="editable">
+            <bool>true</bool>
+           </property>
+           <item>
+            <property name="text">
+             <string notr="true">4096</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string notr="true">8192</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string notr="true">16384</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string notr="true">32768</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string notr="true">65536</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string notr="true">131072</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="contextAutoCheck">
+           <property name="text">
+            <string>Auto</string>
+           </property>
+           <property name="toolTip">
+            <string>Use the native context size of the model (-c 0), reduced by --fit if memory is short.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>GPU Layers:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <layout class="QHBoxLayout" name="gpuLayout" stretch="1,0">
+         <item>
+          <widget class="QSpinBox" name="gpuLayersSpin">
+           <property name="maximum">
+            <number>999</number>
+           </property>
+           <property name="value">
+            <number>35</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="gpuAutoCheck">
+           <property name="text">
+            <string>Auto</string>
+           </property>
+           <property name="toolTip">
+            <string>Let llama-server offload as many layers as fit into VRAM (-ngl auto --fit on).</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelMoe">
+         <property name="text">
+          <string>MoE experts on CPU:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <layout class="QHBoxLayout" name="moeLayout" stretch="1,0">
+         <item>
+          <widget class="QComboBox" name="moeModeCombo">
+           <property name="toolTip">
+            <string>For Mixture-of-Experts models: keep expert weights in system RAM so the rest of the model fits into VRAM. Auto leaves the decision to --fit.</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>Auto</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>All experts (--cpu-moe)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>First N layers (--n-cpu-moe)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="moeLayersSpin">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>999</number>
+           </property>
+           <property name="value">
+            <number>20</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="labelFlashAttn">
+         <property name="text">
+          <string>Flash Attention:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="flashAttnCombo">
+         <item>
           <property name="text">
            <string>Auto</string>
           </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>GPU Layers:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <layout class="QHBoxLayout" name="horizontalLayout">
-        <item>
-         <widget class="QSpinBox" name="gpuLayersSpin">
-          <property name="maximum">
-           <number>999</number>
-          </property>
-          <property name="value">
-           <number>35</number>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QCheckBox" name="gpuAutoCheck">
+         </item>
+         <item>
           <property name="text">
-           <string>Auto</string>
+           <string>On</string>
           </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Port:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QSpinBox" name="portSpin">
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>65535</number>
-        </property>
-        <property name="value">
-         <number>8080</number>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Extra Arguments:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1" colspan="2">
-       <widget class="QLineEdit" name="extraArgsEdit">
-        <property name="placeholderText">
-         <string>e.g. --jinja -fa on --temp 0.7</string>
-        </property>
-        <property name="toolTip">
-         <string>Additional llama-server arguments, appended as-is. Quotes are supported.</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="0" colspan="2">
-       <widget class="QCheckBox" name="ctxShiftCheck">
-        <property name="text">
-         <string>Context Shift</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="0" colspan="2">
-       <widget class="QCheckBox" name="noUiCheck">
-        <property name="text">
-         <string>Disable Web UI</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+         </item>
+         <item>
+          <property name="text">
+           <string>Off</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>Extra Arguments:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="extraArgsEdit">
+         <property name="placeholderText">
+          <string>e.g. --jinja --temp 0.7</string>
+         </property>
+         <property name="toolTip">
+          <string>Additional llama-server arguments, appended as-is. Quotes are supported.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QCheckBox" name="ctxShiftCheck">
+         <property name="text">
+          <string>Context Shift</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="launcherGroup">
+      <property name="title">
+       <string>Launcher</string>
+      </property>
+      <layout class="QHBoxLayout" name="launcherLayout">
+       <item>
+        <widget class="QCheckBox" name="launchAtLoginCheck">
+         <property name="text">
+          <string>Launch at login (in tray)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="autoStartServerCheck">
+         <property name="text">
+          <string>Start server when the launcher opens</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="notificationsCheck">
+         <property name="text">
+          <string>Notifications</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="launcherSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </item>
     <item>
      <widget class="QPushButton" name="startButton">
       <property name="text">
        <string>Start Llama Server</string>
       </property>
+      <property name="minimumHeight">
+       <number>36</number>
+      </property>
      </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="statusLayout" stretch="1,0,0">
+      <item>
+       <widget class="QLabel" name="statusLabel">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="textFormat">
+         <enum>Qt::TextFormat::RichText</enum>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::TextInteractionFlag::TextBrowserInteraction</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="openBrowserButton">
+        <property name="text">
+         <string>Open in Browser</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="copyUrlButton">
+        <property name="text">
+         <string>Copy URL</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item>
      <widget class="QPlainTextEdit" name="consoleOutput">
@@ -189,17 +538,6 @@
     </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>30</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
  <connections/>
