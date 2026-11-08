@@ -40,6 +40,8 @@ private slots:
     void on_startButton_clicked();
     void on_openBrowserButton_clicked();
     void on_copyUrlButton_clicked();
+    void on_generateKeyButton_clicked();
+    void updateNetworkHint();
     void readProcessOutput();
     void handleProcessStarted();
     void handleProcessError(QProcess::ProcessError error);
@@ -75,6 +77,7 @@ private:
     QString m_runningModelName;
     int m_runningPort = 8080;
     bool m_runningWebUi = true;
+    bool m_runningLan = false;
     bool m_stopRequested = false; // distinguishes a user stop from a crash
     QByteArray m_outputBuffer;    // incomplete trailing line of server output
     QString m_lastOutputLine;
@@ -91,6 +94,8 @@ private:
     void notify(const QString &title, const QString &message,
                 QSystemTrayIcon::MessageIcon icon = QSystemTrayIcon::Information);
     QUrl serverUrl() const;
+    QUrl lanUrl() const;          // first LAN address, or empty if not listening on the network
+    static QString lanAddress();
     QStringList buildArguments() const;
 
     QString serverExecutable() const;

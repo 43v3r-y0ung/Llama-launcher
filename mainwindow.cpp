@@ -12,6 +12,8 @@
 #include <QFontDatabase>
 #include <QIntValidator>
 #include <QMessageBox>
+#include <QNetworkInterface>
+#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSettings>
@@ -82,6 +84,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->serverPathEdit, &QLineEdit::editingFinished, this, &MainWindow::refreshServerInfo);
     connect(ui->modelsDirEdit, &QLineEdit::editingFinished, this, [this] { rescanModels(); });
     connect(ui->launchAtLoginCheck, &QCheckBox::toggled, this, &MainWindow::onLaunchAtLoginToggled);
+    connect(ui->lanAccessCheck, &QCheckBox::toggled, this, &MainWindow::updateNetworkHint);
+    connect(ui->apiKeyEdit, &QLineEdit::textChanged, this, &MainWindow::updateNetworkHint);
+    connect(ui->portSpin, &QSpinBox::valueChanged, this, &MainWindow::updateNetworkHint);
 
     // Server output: stdout and stderr interleaved in the order they were written.
     m_process->setProcessChannelMode(QProcess::MergedChannels);
@@ -221,6 +226,33 @@ QUrl MainWindow::serverUrl() const
     return QUrl(QStringLiteral("http://127.0.0.1:%1/").arg(m_runningPort));
 }
 
+QString MainWindow::lanAddress()
+{
+    // Pick the IPv4 address of a real network card; skip loopback and virtual bridges
+    // (Docker, libvirt, VPN tunnels...) whose addresses are useless to other machines.
+    static const QRegularExpression virtualIf(QStringLiteral("^(docker|br-|veth|virbr|vmnet|vboxnet|tun|tap|wg|lxc|lxd|podman|cni|flannel|zt)"));
+    const auto interfaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface &iface : interfaces) {
+        const auto flags = iface.flags();
+        if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::IsRunning)
+            || (flags & QNetworkInterface::IsLoopBack) || virtualIf.match(iface.name()).hasMatch())
+            continue;
+        const auto entries = iface.addressEntries();
+        for (const QNetworkAddressEntry &entry : entries) {
+            const QHostAddress ip = entry.ip();
+            if (ip.protocol() == QAbstractSocket::IPv4Protocol && !ip.isLoopback() && !ip.isLinkLocal())
+                return ip.toString();
+        }
+    }
+    return {};
+}
+
+QUrl MainWindow::lanUrl() const
+{
+    const QString ip = m_runningLan ? lanAddress() : QString();
+    return ip.isEmpty() ? QUrl() : QUrl(QStringLiteral("http://%1:%2/").arg(ip).arg(m_runningPort));
+}
+
 void MainWindow::setStatus(Status status)
 {
     const Status previous = m_status;
@@ -240,6 +272,9 @@ void MainWindow::setStatus(Status status)
         const QString url = serverUrl().toString();
         html += QStringLiteral(" &mdash; %1 &mdash; <a href='%2'>%2</a>")
                     .arg(m_runningModelName.toHtmlEscaped(), url.toHtmlEscaped());
+        const QString lan = lanUrl().toString();
+        if (!lan.isEmpty())
+            html += QStringLiteral(" &middot; %1 <a href='%2'>%2</a>").arg(tr("network:"), lan.toHtmlEscaped());
     }
     ui->statusLabel->setText(html);
     ui->statusLabel->setOpenExternalLinks(true);
@@ -256,11 +291,16 @@ void MainWindow::setStatus(Status status)
         QString tooltip = tr("Llama Launcher\nStatus: %1").arg(text);
         if (status != Status::Stopped)
             tooltip += tr("\nModel: %1\n%2").arg(m_runningModelName, serverUrl().toString());
+        if (status != Status::Stopped && !lanUrl().isEmpty())
+            tooltip += QLatin1Char('\n') + lanUrl().toString();
         m_trayIcon->setToolTip(tooltip);
     }
 
-    if (previous != Status::Running && status == Status::Running)
-        notify(tr("Llama server is ready"), tr("%1\n%2").arg(m_runningModelName, serverUrl().toString()));
+    if (previous != Status::Running && status == Status::Running) {
+        const QUrl lan = lanUrl();
+        notify(tr("Llama server is ready"),
+               tr("%1\n%2").arg(m_runningModelName, (lan.isEmpty() ? serverUrl() : lan).toString()));
+    }
 
     updateUiState();
 }
@@ -272,8 +312,40 @@ void MainWindow::on_openBrowserButton_clicked()
 
 void MainWindow::on_copyUrlButton_clicked()
 {
-    QGuiApplication::clipboard()->setText(serverUrl().toString());
-    statusBar()->showMessage(tr("Copied %1").arg(serverUrl().toString()), 3000);
+    // With network access on, the network address is the one worth sharing with other machines.
+    const QUrl lan = lanUrl();
+    const QString url = (lan.isEmpty() ? serverUrl() : lan).toString();
+    QGuiApplication::clipboard()->setText(url);
+    statusBar()->showMessage(tr("Copied %1").arg(url), 3000);
+}
+
+void MainWindow::on_generateKeyButton_clicked()
+{
+    // 128 random bits from the OS CSPRNG, hex-encoded.
+    QByteArray bytes(16, Qt::Uninitialized);
+    QRandomGenerator::system()->fillRange(reinterpret_cast<quint32 *>(bytes.data()), bytes.size() / 4);
+    ui->apiKeyEdit->setText(QString::fromLatin1(bytes.toHex()));
+    ui->apiKeyEdit->setEchoMode(QLineEdit::Normal); // show it once so it can be copied
+    ui->apiKeyEdit->selectAll();
+    ui->apiKeyEdit->setFocus();
+}
+
+void MainWindow::updateNetworkHint()
+{
+    const bool lan = ui->lanAccessCheck->isChecked();
+    const bool hasKey = !ui->apiKeyEdit->text().trimmed().isEmpty();
+    QString html;
+    if (lan) {
+        const QString ip = lanAddress();
+        const QString addr = ip.isEmpty() ? tr("no network connection found")
+                                          : QStringLiteral("http://%1:%2/").arg(ip).arg(ui->portSpin->value());
+        html = tr("Other computers can connect at %1").arg(QStringLiteral("<b>%1</b>").arg(addr.toHtmlEscaped()));
+        if (!hasKey)
+            html += QStringLiteral("<br><span style='color:#d35400'>&#9888; %1</span>")
+                        .arg(tr("No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi.").toHtmlEscaped());
+    }
+    ui->networkHintLabel->setText(html);
+    ui->networkHintLabel->setVisible(!html.isEmpty());
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +401,9 @@ QStringList MainWindow::buildArguments() const
         arguments << "--context-shift";
     if (ui->noUiCheck->isChecked())
         arguments << "--no-ui";
+    if (ui->lanAccessCheck->isChecked())
+        arguments << "--host" << "0.0.0.0";
+    // The API key is passed via LLAMA_API_KEY (see startServer) so it does not show up in `ps` or the log.
 
     arguments << "--port" << QString::number(ui->portSpin->value());
 
@@ -374,6 +449,14 @@ void MainWindow::startServer()
     m_runningModelName = QFileInfo(modelPath).fileName();
     m_runningPort = ui->portSpin->value();
     m_runningWebUi = !ui->noUiCheck->isChecked();
+    m_runningLan = ui->lanAccessCheck->isChecked();
+
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.remove(QStringLiteral("LLAMA_API_KEY"));
+    const QString apiKey = ui->apiKeyEdit->text().trimmed();
+    if (!apiKey.isEmpty())
+        env.insert(QStringLiteral("LLAMA_API_KEY"), apiKey);
+    m_process->setProcessEnvironment(env);
 
     ui->consoleOutput->clear();
     ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, arguments.join(QLatin1Char(' '))));
@@ -808,6 +891,9 @@ void MainWindow::updateUiState()
     ui->refreshDevicesButton->setEnabled(!running);
     ui->portSpin->setEnabled(!running);
     ui->noUiCheck->setEnabled(!running);
+    ui->lanAccessCheck->setEnabled(!running);
+    ui->apiKeyEdit->setEnabled(!running);
+    ui->generateKeyButton->setEnabled(!running);
     ui->serverPathEdit->setEnabled(!running);
     ui->serverBrowseButton->setEnabled(!running);
 }
@@ -910,6 +996,8 @@ void MainWindow::saveSettings()
     settings.setValue("serverPath", ui->serverPathEdit->text().trimmed());
     settings.setValue("port", ui->portSpin->value());
     settings.setValue("noUi", ui->noUiCheck->isChecked());
+    settings.setValue("lanAccess", ui->lanAccessCheck->isChecked());
+    settings.setValue("apiKey", ui->apiKeyEdit->text().trimmed());
     settings.setValue("modelsDir", ui->modelsDirEdit->text().trimmed());
     settings.setValue("lastModel", m_currentModelPath);
     settings.setValue("autoStartServer", ui->autoStartServerCheck->isChecked());
@@ -917,6 +1005,10 @@ void MainWindow::saveSettings()
     settings.setValue("windowGeometry", saveGeometry());
     if (!m_currentModelPath.isEmpty())
         saveModelSettings(m_currentModelPath);
+
+    // The file may hold the API key: keep it readable by the owner only.
+    settings.sync();
+    QFile::setPermissions(settings.fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 }
 
 void MainWindow::loadSettings()
@@ -928,6 +1020,9 @@ void MainWindow::loadSettings()
     ui->serverPathEdit->setText(settings.value("serverPath").toString());
     ui->portSpin->setValue(settings.value("port", 8080).toInt());
     ui->noUiCheck->setChecked(settings.value("noUi", false).toBool());
+    ui->lanAccessCheck->setChecked(settings.value("lanAccess", false).toBool());
+    ui->apiKeyEdit->setText(settings.value("apiKey").toString());
+    updateNetworkHint();
     ui->autoStartServerCheck->setChecked(settings.value("autoStartServer", false).toBool());
     ui->notificationsCheck->setChecked(settings.value("notifications", true).toBool());
     ui->launchAtLoginCheck->setChecked(QFileInfo::exists(autostartFilePath()));

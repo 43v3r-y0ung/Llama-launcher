@@ -110,6 +110,67 @@
          </item>
         </layout>
        </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelNetwork">
+         <property name="text">
+          <string>Network:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <layout class="QHBoxLayout" name="networkLayout" stretch="0,0,1">
+         <item>
+          <widget class="QCheckBox" name="lanAccessCheck">
+           <property name="text">
+            <string>Allow access from local network</string>
+           </property>
+           <property name="toolTip">
+            <string>Listen on all network interfaces (--host 0.0.0.0) so other computers on your network can use the server.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelApiKey">
+           <property name="text">
+            <string>API key:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="apiKeyEdit">
+           <property name="echoMode">
+            <enum>QLineEdit::EchoMode::PasswordEchoOnEdit</enum>
+           </property>
+           <property name="placeholderText">
+            <string>none</string>
+           </property>
+           <property name="toolTip">
+            <string>Clients must send this key (Authorization: Bearer &lt;key&gt;; the Web UI asks for it in its settings). Leave empty for no key.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="4" column="2">
+        <widget class="QPushButton" name="generateKeyButton">
+         <property name="text">
+          <string>Generate</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QLabel" name="networkHintLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>

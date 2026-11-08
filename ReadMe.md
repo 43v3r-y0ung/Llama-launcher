@@ -23,6 +23,11 @@ Key Features
         Quick Access Menu: Start/Stop the server, open it in the browser or exit from the right-click context menu.
         Notifications when the server is ready, fails to start or stops unexpectedly (can be turned off).
         Launch at login: starts hidden in the tray (writes ~/.config/autostart/llama-launcher.desktop); optionally starts the server right away.
+    Local Network Access:
+        "Allow access from local network" makes the server listen on all interfaces (--host 0.0.0.0); the network address (e.g. http://192.168.1.10:8080/) is shown in the status line and copied by Copy URL.
+        Optional API key (with a Generate button). It is passed to llama-server via the LLAMA_API_KEY environment variable, so it does not appear in the process list or the log. Clients send it as "Authorization: Bearer <key>"; the Web UI asks for it in its settings.
+        The settings file is kept readable by the owner only, since it stores the key.
+        The firewall must allow the port (on openSUSE: sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload, unless the interface is in a trusted zone). Do not expose the port to the internet; to reach the server from another network use a VPN such as Tailscale or WireGuard.
     Advanced LLM Controls:
         Status line with the server URL, plus Open in Browser and Copy URL buttons.
         Support for Context Shift (--context-shift) to handle infinite text generation efficiently.
