@@ -146,6 +146,14 @@ void MainWindow::startServer()
         arguments << "--no-ui";
     }
 
+    arguments << "--port" << QString::number(ui->portSpin->value());
+
+    // Extra user-supplied arguments (appended last so they can override defaults)
+    const QString extraArgs = ui->extraArgsEdit->text().trimmed();
+    if (!extraArgs.isEmpty()) {
+        arguments << QProcess::splitCommand(extraArgs);
+    }
+
     ui->consoleOutput->clear();
     ui->consoleOutput->appendPlainText(tr("Starting llama-server with arguments: %1").arg(arguments.join(" ")));
 
@@ -157,6 +165,7 @@ void MainWindow::startServer()
         m_healthTimer->start();
         m_currentStatus = tr("Loading");
         m_currentModel = modelPath.section('/', -1);
+        m_currentPort = ui->portSpin->value();
     }
     updateTrayMenuState();
     updateUiState();
@@ -247,6 +256,8 @@ void MainWindow::saveSettings() {
     settings.setValue("contextAuto", ui->contextAutoCheck->isChecked());
     settings.setValue("contextShift", ui->ctxShiftCheck->isChecked());
     settings.setValue("noUi", ui->noUiCheck->isChecked());
+    settings.setValue("port", ui->portSpin->value());
+    settings.setValue("extraArgs", ui->extraArgsEdit->text());
 }
 
 void MainWindow::loadSettings() {
@@ -266,6 +277,8 @@ void MainWindow::loadSettings() {
 
     ui->ctxShiftCheck->setChecked(settings.value("contextShift", false).toBool());
     ui->noUiCheck->setChecked(settings.value("noUi", false).toBool());
+    ui->portSpin->setValue(settings.value("port", 8080).toInt());
+    ui->extraArgsEdit->setText(settings.value("extraArgs").toString());
 }
 
 void MainWindow::updateUiState() {
@@ -299,7 +312,8 @@ void MainWindow::checkServerHealth() {
         return;
     }
 
-    QNetworkRequest request(QUrl("http://localhost:8080/health"));
+    QNetworkRequest request(QUrl(QStringLiteral("http://127.0.0.1:%1/health").arg(m_currentPort)));
+    request.setTransferTimeout(1500); // shorter than the 2 s poll interval, so replies don't pile up
     QNetworkReply *reply = m_networkManager->get(request);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
