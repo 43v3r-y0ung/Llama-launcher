@@ -1,4 +1,4 @@
-lama Launcher
+Llama Launcher
 Llama Launcher is a lightweight and intuitive C++/Qt GUI wrapper for the llama-server. Specifically designed for Linux users (optimized for openSUSE Tumbleweed and KDE Plasma), it provides a seamless way to manage and run local Large Language Models (LLMs) in GGUF format without the need for complex command-line arguments.
 Key Features
 
@@ -16,7 +16,11 @@ Key Features
         Option to disable the built-in Web UI to save system resources.
         Integrated log viewer to monitor the server's output in real-time.
         Configurable server port (also used for the health check).
-        Extra Arguments field for any other llama-server flags (e.g. --jinja -fa on --temp 0.7), appended last so they can override defaults.
+        Extra Arguments field for any other llama-server flags (e.g. --jinja --temp 0.7), appended last so they can override defaults.
+        Flash Attention selector (Auto / On / Off, passed as -fa).
+    Multi-GPU & Custom Builds:
+        llama-server path: use the system binary from PATH or point the launcher at your own build (e.g. a fresh llama.cpp Vulkan build). The detected version is shown under the field.
+        Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
 
 Technical Stack
 
@@ -27,30 +31,44 @@ Technical Stack
 
 Installation & Setup
 Prerequisites
-The launcher requires the system-installed llama-server. Ensure it is available on your machine:
+The launcher needs a llama-server binary: either the distribution package or your own build.
 
-# For openSUSE Tumbleweed
-sudo zypper install llama.cpp-server
+# openSUSE Tumbleweed (package name: llamacpp)
+sudo zypper install llamacpp
+
+Building llama.cpp with Vulkan (optional)
+Needs vulkan-devel, shaderc (provides glslc), cmake and a C++ compiler:
+
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j$(nproc)
+build/bin/llama-server --list-devices
+
+Then set the llama-server path in the launcher to llama.cpp/build/bin/llama-server.
 
 Building from Source
 You can build the project using CMake:
 
-cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake -B build-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/.local
 cmake --build build-release --config Release
 
-Desktop Integration
-To integrate the launcher into your application menu, create a .desktop file at ~/.local/share/applications/llama-launcher.desktop:
+Installation & Desktop Integration
+Install the binary, the icon and the application-menu entry in one step:
 
-[Desktop Entry]
-Name=Llama Launcher
-Comment=GUI for running local LLM models via llama-server
-Exec=/path/to/your/bin/Llama-launcher
-Icon=/path/to/your/icons/icon.svg
-Type=Application
-Categories=Development;Utility;
+cmake --install build-release
+
+This installs to the prefix chosen above:
+    bin/Llama-launcher
+    share/applications/llama-launcher.desktop
+    share/icons/hicolor/scalable/apps/llama-launcher.svg
+Use -DCMAKE_INSTALL_PREFIX=/usr/local (and sudo for the install step) for a system-wide install. To update, pull, rebuild and run the install command again.
+
+Settings are stored in ~/.config/LlamaLauncher/LlamaLauncher.conf (older versions used ~/.config/MyCompany/; those settings are imported automatically on first start).
 
 How to Use
 
+    Optionally choose the llama-server binary and the device (GPU) to use.
     Browse for your model file (.gguf).
     Enable Auto for Context Size and GPU Layers to let the launcher find the optimal settings.
     Click Start Llama Server.

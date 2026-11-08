@@ -22,15 +22,18 @@ target_link_libraries(Llama-launcher
         Qt::Network
 )
 
+include(GNUInstallDirs)
+
 install(TARGETS Llama-launcher
-    BUNDLE  DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET Llama-launcher
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
+# Desktop integration (XDG): icon + menu entry pointing at the installed binary.
+install(FILES rsc/gemini-svg.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME llama-launcher.svg
 )
-install(SCRIPT ${deploy_script})
+configure_file(llama-launcher.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)

@@ -9,6 +9,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
+#include <functional>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -24,6 +25,8 @@ public:
 
 private slots:
     void on_browseButton_clicked();
+    void on_serverBrowseButton_clicked();
+    void on_refreshDevicesButton_clicked();
     void on_startButton_clicked();
     void readProcessOutput();
     void handleProcessError(QProcess::ProcessError error);
@@ -57,6 +60,14 @@ private:
     QString m_currentModel;
     int m_currentPort = 8080;
     bool m_isQuitting = false;
+    QString m_savedDevice;   // device id restored from settings, applied once the list is loaded
+    int m_probeGeneration = 0;
+
+    QString serverExecutable() const;
+    void refreshServerInfo();
+    void runServerProbe(const QStringList &args, std::function<void(bool ok, const QString &output)> onDone);
+    void populateDevices(const QString &listOutput);
+    static void migrateLegacySettings();
 
     void setupSystemTray();
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
