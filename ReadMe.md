@@ -2,31 +2,41 @@ Llama Launcher
 Llama Launcher is a lightweight and intuitive C++/Qt GUI wrapper for the llama-server. Specifically designed for Linux users (optimized for openSUSE Tumbleweed and KDE Plasma), it provides a seamless way to manage and run local Large Language Models (LLMs) in GGUF format without the need for complex command-line arguments.
 Key Features
 
+    Model Management:
+        Model list: scans a models folder (recursively) for .gguf files and remembers recently used models from elsewhere. Multimodal projectors (mmproj) and the extra parts of split models are hidden.
+        Model info read straight from the GGUF header: name, size, layer count, native context length and, for Mixture-of-Experts models, the number of experts.
+        VRAM check: warns when the model is larger than the free memory of the selected GPU.
+        Per-model settings: context size, GPU layers, device, MoE, Flash Attention, context shift and extra arguments are remembered for each model separately and restored when you switch back.
     Intelligent Parameter Optimization:
         Auto GPU Offloading (-ngl auto): Automatically calculates and offloads the maximum possible number of model layers to VRAM for peak performance.
         Native Context Detection (-c 0): Automatically retrieves the model's native context size from its metadata (e.g., 131,072 tokens for Qwen2.5).
         Smart Resource Fitting (--fit on): Dynamically adjusts memory-related parameters to fit your specific hardware, ensuring stable operation without crashes.
+        MoE experts on CPU (--cpu-moe / --n-cpu-moe N): for large MoE models on small GPUs, keeps the expert weights in system RAM and the rest in VRAM. On a 4 GB card this doubled prompt processing speed for a 35B-A3B model compared to leaving it to --fit.
+        Flash Attention selector (Auto / On / Off, passed as -fa).
+    Multi-GPU & Custom Builds:
+        llama-server path: use the system binary from PATH or point the launcher at your own build (e.g. a fresh llama.cpp Vulkan build). The detected version is shown under the field.
+        Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
     Deep KDE Plasma Integration:
         System Tray Support: Runs quietly in the background with a dedicated tray icon.
         Minimize to Tray: Closing the main window hides the application to the tray instead of terminating the server.
-        Dynamic Tooltips: Hover over the tray icon to see real-time server status and the name of the currently loaded model.
-        Quick Access Menu: Start/Stop the server or exit the application directly from the right-click context menu.
+        Dynamic Tooltips: Hover over the tray icon to see real-time server status, the loaded model and its URL.
+        Quick Access Menu: Start/Stop the server, open it in the browser or exit from the right-click context menu.
+        Notifications when the server is ready, fails to start or stops unexpectedly (can be turned off).
+        Launch at login: starts hidden in the tray (writes ~/.config/autostart/llama-launcher.desktop); optionally starts the server right away.
     Advanced LLM Controls:
+        Status line with the server URL, plus Open in Browser and Copy URL buttons.
         Support for Context Shift (--context-shift) to handle infinite text generation efficiently.
         Option to disable the built-in Web UI to save system resources.
         Integrated log viewer to monitor the server's output in real-time.
         Configurable server port (also used for the health check).
         Extra Arguments field for any other llama-server flags (e.g. --jinja --temp 0.7), appended last so they can override defaults.
-        Flash Attention selector (Auto / On / Off, passed as -fa).
-    Multi-GPU & Custom Builds:
-        llama-server path: use the system binary from PATH or point the launcher at your own build (e.g. a fresh llama.cpp Vulkan build). The detected version is shown under the field.
-        Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
+    Localization: English and Ukrainian; the language follows the system locale.
 
 Technical Stack
 
     Language: C++
     Framework: Qt 6
-    Build System: CMake
+    Build System: CMake (Qt LinguistTools for translations)
     Target OS: Linux (openSUSE, Arch, Fedora, etc.)
 
 Installation & Setup
@@ -64,12 +74,17 @@ This installs to the prefix chosen above:
     share/icons/hicolor/scalable/apps/llama-launcher.svg
 Use -DCMAKE_INSTALL_PREFIX=/usr/local (and sudo for the install step) for a system-wide install. To update, pull, rebuild and run the install command again.
 
+Command line: Llama-launcher --autostart starts hidden in the tray (used by the login entry).
+
+Translations: after changing UI strings run cmake --build build-release --target update_translations and translate translations/llama-launcher_uk.ts with Qt Linguist.
+
 Settings are stored in ~/.config/LlamaLauncher/LlamaLauncher.conf (older versions used ~/.config/MyCompany/; those settings are imported automatically on first start).
 
 How to Use
 
     Optionally choose the llama-server binary and the device (GPU) to use.
-    Browse for your model file (.gguf).
+    Choose the models folder, then pick a model from the list (or Browse for a single .gguf file).
+    Check the model info and VRAM hint; for large MoE models try "MoE experts on CPU".
     Enable Auto for Context Size and GPU Layers to let the launcher find the optimal settings.
     Click Start Llama Server.
     By default, the server will be accessible at http://127.0.0.1:8080 (change the port in the Port field).

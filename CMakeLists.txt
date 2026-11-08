@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(Llama-launcher LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network LinguistTools)
 
 set(CMAKE_AUTORCC ON)
 qt_standard_project_setup()
@@ -12,7 +12,16 @@ qt_add_executable(Llama-launcher
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    gguf.cpp
+    gguf.h
     resources.qrc
+)
+
+# Ukrainian UI translation, compiled and embedded under :/i18n
+qt_add_translations(Llama-launcher
+    TS_FILES translations/llama-launcher_uk.ts
+    RESOURCE_PREFIX /i18n
+    LUPDATE_OPTIONS -no-obsolete
 )
 
 target_link_libraries(Llama-launcher
