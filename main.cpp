@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("LlamaLauncher"));
     QApplication::setApplicationDisplayName(QStringLiteral("Llama Launcher"));
     QApplication::setDesktopFileName(QStringLiteral("llama-launcher"));
-    a.setWindowIcon(QIcon(":/rsc/gemini-svg.svg"));
+    a.setWindowIcon(QIcon(":/rsc/llama-launcher.svg"));
     // Closing the window only hides it to the tray; quitting is explicit.
     QApplication::setQuitOnLastWindowClosed(false);
 

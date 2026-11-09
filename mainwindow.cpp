@@ -166,7 +166,7 @@ void MainWindow::setupSystemTray()
     m_trayMenu->addSeparator();
     m_trayMenu->addAction(tr("Exit"), this, &MainWindow::quitApplication);
 
-    m_trayIcon = new QSystemTrayIcon(QIcon(QStringLiteral(":/rsc/gemini-svg.svg")), this);
+    m_trayIcon = new QSystemTrayIcon(QIcon(QStringLiteral(":/rsc/llama-launcher.svg")), this);
     m_trayIcon->setToolTip(tr("Llama Launcher"));
     m_trayIcon->setContextMenu(m_trayMenu);
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
