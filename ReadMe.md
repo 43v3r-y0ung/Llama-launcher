@@ -2,17 +2,29 @@ Llama Launcher
 Llama Launcher is a lightweight and intuitive C++/Qt GUI wrapper for the llama-server. Specifically designed for Linux users (optimized for openSUSE Tumbleweed and KDE Plasma), it provides a seamless way to manage and run local Large Language Models (LLMs) in GGUF format without the need for complex command-line arguments.
 Key Features
 
+    Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with the Start/Stop button, the server status and live CPU/GPU/tok/s indicators always visible below them.
     Model Management:
         Model list: scans a models folder (recursively) for .gguf files and remembers recently used models from elsewhere. Multimodal projectors (mmproj) and the extra parts of split models are hidden.
         Model info read straight from the GGUF header: name, size, layer count, native context length and, for Mixture-of-Experts models, the number of experts.
         VRAM check: warns when the model is larger than the free memory of the selected GPU.
-        Per-model settings: context size, GPU layers, device, MoE, Flash Attention, context shift and extra arguments are remembered for each model separately and restored when you switch back.
+        Per-model settings: context size, GPU layers, device, MoE, Flash Attention, every option on the Advanced tab and the extra arguments are remembered for each model separately and restored when you switch back.
     Intelligent Parameter Optimization:
         Auto GPU Offloading (-ngl auto): Automatically calculates and offloads the maximum possible number of model layers to VRAM for peak performance.
         Native Context Detection (-c 0): Automatically retrieves the model's native context size from its metadata (e.g., 131,072 tokens for Qwen2.5).
         Smart Resource Fitting (--fit on): Dynamically adjusts memory-related parameters to fit your specific hardware, ensuring stable operation without crashes.
         MoE experts on CPU (--cpu-moe / --n-cpu-moe N): for large MoE models on small GPUs, keeps the expert weights in system RAM and the rest in VRAM. On a 4 GB card this doubled prompt processing speed for a 35B-A3B model compared to leaving it to --fit.
         Flash Attention selector (Auto / On / Off, passed as -fa).
+    Advanced tab (each option is a checkbox or field instead of a flag to remember):
+        Memory and performance: KV cache type (f16 / q8_0 / q4_0, as -ctk/-ctv; a quantized cache needs Flash Attention and the launcher warns if it is off), KV cache in system RAM (--no-kv-offload), --mlock, --no-mmap, CPU threads (-t), batch / micro-batch (-b / -ub) and parallel slots (-np), each with an Auto checkbox.
+        Chat: thinking mode Auto / On / Off (--reasoning) and a thinking budget (--reasoning-budget), Jinja chat template (unchecked passes --no-jinja), and the multimodal projector: an mmproj*.gguf file next to the model is detected and can be loaded (--mmproj), optionally kept on the CPU (--no-mmproj-offload).
+        Default sampling: temperature, top-p, top-k and min-p, each sent only when checked; clients can still override them per request.
+        Other: Context Shift, Prometheus metrics endpoint (--metrics), skip the warm-up run (--no-warmup).
+        Flags typed into Extra Arguments that now have their own control (e.g. -ctk q8_0 -ctv q8_0 --jinja -t 6) are moved into it automatically; anything else stays as typed.
+    Monitoring (Monitor tab), read from /proc, amdgpu sysfs and the server itself, without root or extra packages:
+        Charts for the last 5 minutes: CPU and RAM (whole system and llama-server), AMD GPU load with temperature, power and clock, VRAM with the shared system memory (GTT), and generation speed. Hover a chart to read the values at that moment.
+        Live status: prompt processing progress and speed, generation speed in tokens per second, context in use, RAM used by llama-server, and the final speeds of the last request.
+        Generation speed and context use come from llama-server's /slots endpoint (enabled by default), prompt progress and final speeds from its log. A sleeping (runtime-suspended) GPU is reported idle and is not woken up.
+        The bottom bar shows CPU and GPU sparklines for the last minute and the current tok/s. Sampling stops while the window is in the tray and the server is not running.
     Multi-GPU & Custom Builds:
         llama-server path: use the system binary from PATH or point the launcher at your own build (e.g. a fresh llama.cpp Vulkan build). The detected version is shown under the field.
         Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
@@ -32,9 +44,9 @@ Key Features
         Status line with the server URL, plus Open in Browser and Copy URL buttons.
         Support for Context Shift (--context-shift) to handle infinite text generation efficiently.
         Option to disable the built-in Web UI to save system resources.
-        Integrated log viewer to monitor the server's output in real-time.
+        Integrated log viewer (Log tab) with Copy and Clear buttons; it comes to the front when the server fails to start or stops unexpectedly.
         Configurable server port (also used for the health check).
-        Extra Arguments field for any other llama-server flags (e.g. --jinja --temp 0.7), appended last so they can override defaults.
+        Extra Arguments field (Advanced tab) for any other llama-server flags (e.g. --seed 42 --repeat-penalty 1.1), appended last so they can override defaults.
     Localization: English and Ukrainian; the language follows the system locale.
 
 Technical Stack
@@ -87,11 +99,13 @@ Settings are stored in ~/.config/LlamaLauncher/LlamaLauncher.conf (older version
 
 How to Use
 
-    Optionally choose the llama-server binary and the device (GPU) to use.
-    Choose the models folder, then pick a model from the list (or Browse for a single .gguf file).
+    On the Server tab, optionally choose the llama-server binary and the device (GPU) to use.
+    On the Model tab, choose the models folder, then pick a model from the list (or Browse for a single .gguf file).
     Check the model info and VRAM hint; for large MoE models try "MoE experts on CPU".
     Enable Auto for Context Size and GPU Layers to let the launcher find the optimal settings.
+    Optionally fine-tune the model on the Advanced tab (e.g. a q8_0 KV cache to fit a longer context into VRAM).
     Click Start Llama Server.
-    By default, the server will be accessible at http://127.0.0.1:8080 (change the port in the Port field).
+    By default, the server will be accessible at http://127.0.0.1:8080 (change the port on the Server tab).
+    Watch speed and resource use on the Monitor tab; the server output is on the Log tab.
 
 This project leverages the power of the llama.cpp HTTP server.

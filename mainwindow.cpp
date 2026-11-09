@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QIntValidator>
+#include <QLocale>
 #include <QMessageBox>
 #include <QNetworkInterface>
 #include <QRandomGenerator>
@@ -19,6 +20,10 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QThread>
+
+#include <cmath>
+#include <limits>
 
 namespace {
 
@@ -29,6 +34,47 @@ constexpr int kDeviceFreeMiBRole = Qt::UserRole + 1;
 
 enum MoeMode { MoeAuto = 0, MoeAll = 1, MoeFirstN = 2 };
 enum FlashAttn { FaAuto = 0, FaOn = 1, FaOff = 2 };
+enum Reasoning { ReasoningAuto = 0, ReasoningOn = 1, ReasoningOff = 2 };
+
+// KV cache types offered in kvCacheCombo, by index; index 0 is the server default (f16).
+const QStringList kKvCacheTypes = {QStringLiteral("f16"), QStringLiteral("q8_0"), QStringLiteral("q4_0")};
+
+// Inverse of QProcess::splitCommand(): quote tokens that would otherwise be split or mangled.
+QString joinCommand(const QStringList &tokens)
+{
+    QStringList quoted;
+    for (const QString &t : tokens) {
+        if (t.isEmpty() || t.contains(QLatin1Char(' ')) || t.contains(QLatin1Char('\t')) || t.contains(QLatin1Char('"'))) {
+            QString escaped = t;
+            escaped.replace(QLatin1String("\""), QLatin1String("\"\"\"")); // splitCommand: """ is a literal quote
+            quoted << QLatin1Char('"') + escaped + QLatin1Char('"');
+        } else {
+            quoted << t;
+        }
+    }
+    return quoted.join(QLatin1Char(' '));
+}
+
+// The multimodal projector shipped next to a model (mmproj*.gguf); the one whose name
+// shares the longest prefix with the model wins when there are several.
+QString findMmproj(const QString &modelPath)
+{
+    const QFileInfo model(modelPath);
+    const QFileInfoList candidates = model.dir().entryInfoList({QStringLiteral("*mmproj*.gguf")}, QDir::Files, QDir::Name);
+    QString best;
+    int bestScore = -1;
+    for (const QFileInfo &fi : candidates) {
+        const QString a = fi.fileName().toLower(), b = model.fileName().toLower();
+        int common = 0;
+        while (common < a.size() && common < b.size() && a.at(common) == b.at(common))
+            ++common;
+        if (common > bestScore) {
+            bestScore = common;
+            best = fi.absoluteFilePath();
+        }
+    }
+    return best;
+}
 
 QString modelSettingsGroup(const QString &modelPath)
 {
@@ -64,6 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_healthTimer(new QTimer(this))
     , m_killTimer(new QTimer(this))
+    , m_monitor(new Monitor(this))
 {
     ui->setupUi(this);
 
@@ -74,8 +121,20 @@ MainWindow::MainWindow(QWidget *parent)
     ui->openBrowserButton->setIcon(QIcon::fromTheme(QStringLiteral("internet-web-browser")));
     ui->copyUrlButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->refreshDevicesButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
+    ui->copyLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
+    ui->clearLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-clear-history")));
 
-    connect(ui->gpuAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    ui->threadsSpin->setValue(qMax(1, QThread::idealThreadCount() / 2));
+    for (QCheckBox *check : {ui->gpuAutoCheck, ui->threadsAutoCheck, ui->batchAutoCheck, ui->parallelAutoCheck,
+                             ui->reasoningUnlimitedCheck, ui->mmprojCheck, ui->tempCheck, ui->topPCheck,
+                             ui->topKCheck, ui->minPCheck})
+        connect(check, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    for (QComboBox *combo : {ui->reasoningCombo, ui->kvCacheCombo, ui->flashAttnCombo})
+        connect(combo, &QComboBox::currentIndexChanged, this, &MainWindow::updateUiState);
+    // The physical batch cannot exceed the logical one.
+    connect(ui->batchSpin, &QSpinBox::valueChanged, ui->ubatchSpin, &QSpinBox::setMaximum);
+    ui->ubatchSpin->setMaximum(ui->batchSpin->value());
+    connect(ui->extraArgsEdit, &QLineEdit::editingFinished, this, [this] { migrateExtraArgs(); });
     connect(ui->contextAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
     connect(ui->moeModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateUiState);
     connect(ui->moeModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateFitWarning);
@@ -96,6 +155,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_process, &QProcess::finished, this, &MainWindow::handleProcessFinished);
 
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
+    setupCharts();
+    connect(m_monitor, &Monitor::sampled, this, &MainWindow::onMonitorSample);
     m_healthTimer->setInterval(2000);
 
     m_killTimer->setSingleShot(true);
@@ -150,6 +211,184 @@ void MainWindow::closeEvent(QCloseEvent *event)
         quitApplication();
         event->accept();
     }
+}
+
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+    updateMonitorActivity();
+}
+
+void MainWindow::hideEvent(QHideEvent *event)
+{
+    QMainWindow::hideEvent(event);
+    updateMonitorActivity();
+}
+
+// ---------------------------------------------------------------------------
+// Monitoring
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr int kMiniChartSamples = 60;
+constexpr double kGiB = 1024.0 * 1024.0 * 1024.0;
+
+double orNan(double v)
+{
+    return v < 0 ? std::numeric_limits<double>::quiet_NaN() : v;
+}
+
+double bytesToGiB(qint64 bytes)
+{
+    return bytes < 0 ? std::numeric_limits<double>::quiet_NaN() : bytes / kGiB;
+}
+
+QString formatNumber(double v, int decimals)
+{
+    return QLocale().toString(v, 'f', decimals);
+}
+
+} // namespace
+
+void MainWindow::setupCharts()
+{
+    auto percent = [](double v) { return QStringLiteral("%1 %").arg(formatNumber(v, 0)); };
+    auto gib = [](double v) { return MainWindow::tr("%1 GiB").arg(formatNumber(v, 1)); };
+    auto tps = [](double v) { return MainWindow::tr("%1 tok/s").arg(formatNumber(v, 1)); };
+
+    ui->cpuChart->setTitle(tr("CPU"));
+    ui->cpuChart->setSeriesNames({tr("System"), QStringLiteral("llama-server")});
+    ui->cpuChart->setFormatter(percent);
+    ui->cpuChart->setMaximum(100);
+
+    ui->ramChart->setTitle(tr("RAM"));
+    ui->ramChart->setSeriesNames({tr("System"), QStringLiteral("llama-server")});
+    ui->ramChart->setFormatter(gib);
+
+    ui->gpuChart->setTitle(tr("GPU load"));
+    ui->gpuChart->setFormatter(percent);
+    ui->gpuChart->setMaximum(100);
+
+    ui->vramChart->setTitle(tr("VRAM"));
+    ui->vramChart->setFormatter(gib);
+
+    ui->tpsChart->setTitle(tr("Generation speed"));
+    ui->tpsChart->setFormatter(tps);
+
+    for (ChartWidget *chart : {ui->cpuChart, ui->ramChart, ui->gpuChart, ui->vramChart, ui->tpsChart})
+        chart->setCapacity(Monitor::kHistorySize);
+
+    ui->cpuMini->setMode(ChartWidget::Mode::Mini);
+    ui->cpuMini->setTitle(tr("CPU"));
+    ui->gpuMini->setMode(ChartWidget::Mode::Mini);
+    ui->gpuMini->setTitle(tr("GPU"));
+    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini}) {
+        mini->setFormatter(percent);
+        mini->setMaximum(100);
+        mini->setCapacity(kMiniChartSamples);
+        mini->setToolTip(tr("Last minute; details on the Monitor tab"));
+    }
+    ui->tpsMiniLabel->setVisible(false);
+    ui->serverStatsLabel->setText(tr("The server is not running."));
+}
+
+void MainWindow::updateMonitorActivity()
+{
+    // In the tray with the server stopped there is nothing to show or record.
+    const bool wanted = isVisible() || m_process->state() != QProcess::NotRunning;
+    if (wanted && !m_monitor->isActive())
+        m_monitor->start();
+    else if (!wanted && m_monitor->isActive())
+        m_monitor->stop();
+}
+
+void MainWindow::onMonitorSample(const MonitorSample &s)
+{
+    const QList<MonitorSample> &history = m_monitor->history();
+    QList<double> cpu, procCpu, ram, rss, gpu, vram, gen;
+    for (const MonitorSample &h : history) {
+        cpu << orNan(h.cpuPercent);
+        procCpu << orNan(h.procCpuPercent);
+        ram << bytesToGiB(h.ramUsed);
+        rss << bytesToGiB(h.procRss);
+        gpu << orNan(h.gpuBusy);
+        vram << bytesToGiB(h.vramUsed);
+        gen << orNan(h.genTps);
+    }
+
+    ui->cpuChart->setData({cpu, procCpu});
+    ui->ramChart->setData({ram, rss});
+    if (s.ramTotal > 0)
+        ui->ramChart->setMaximum(s.ramTotal / kGiB);
+    ui->cpuMini->setData({cpu.mid(qMax(0, cpu.size() - kMiniChartSamples))});
+
+    // AMD GPU
+    ui->gpuChart->setVisible(s.gpuPresent);
+    ui->vramChart->setVisible(s.gpuPresent);
+    ui->gpuMini->setVisible(s.gpuPresent);
+    if (s.gpuPresent) {
+        const QString name = m_gpuName.isEmpty() ? m_monitor->gpuName() : m_gpuName;
+        ui->gpuChart->setToolTip(name);
+        ui->vramChart->setToolTip(name);
+        ui->gpuMini->setToolTip(tr("%1, last minute; details on the Monitor tab").arg(name));
+        ui->gpuChart->setData({gpu});
+        ui->gpuMini->setData({gpu.mid(qMax(0, gpu.size() - kMiniChartSamples))});
+        QStringList sensors;
+        if (s.gpuSuspended) {
+            sensors << tr("sleeping (power saving)");
+        } else {
+            if (s.gpuTempC >= 0)
+                sensors << QStringLiteral("%1 °C").arg(formatNumber(s.gpuTempC, 0));
+            if (s.gpuPowerW >= 0)
+                sensors << tr("%1 W").arg(formatNumber(s.gpuPowerW, 0));
+            if (s.gpuClockMHz >= 0)
+                sensors << tr("%1 MHz").arg(s.gpuClockMHz);
+        }
+        ui->gpuChart->setSubtitle(sensors.join(QStringLiteral(" · ")));
+        ui->vramChart->setData({vram});
+        if (s.vramTotal > 0)
+            ui->vramChart->setMaximum(s.vramTotal / kGiB);
+        ui->vramChart->setSubtitle(s.gttUsed >= 0
+            ? tr("Shared system memory (GTT): %1 GiB").arg(formatNumber(s.gttUsed / kGiB, 2))
+            : QString());
+    }
+
+    // llama-server
+    const bool running = m_process->state() != QProcess::NotRunning;
+    ui->tpsChart->setData({gen});
+    QStringList last;
+    if (s.lastGenTps >= 0)
+        last << tr("generation %1 tok/s").arg(formatNumber(s.lastGenTps, 2));
+    if (s.lastPromptTps >= 0)
+        last << tr("prompt %1 tok/s").arg(formatNumber(s.lastPromptTps, 1));
+    ui->tpsChart->setSubtitle(last.isEmpty() ? QString() : tr("Last request: %1").arg(last.join(QStringLiteral(", "))));
+
+    if (!running) {
+        ui->serverStatsLabel->setText(tr("The server is not running."));
+        ui->tpsMiniLabel->setVisible(false);
+        return;
+    }
+    QStringList parts;
+    if (s.promptProgress >= 0)
+        parts << tr("Reading prompt: <b>%1 %</b> at %2 tok/s")
+                     .arg(formatNumber(s.promptProgress * 100, 0), formatNumber(s.promptTps, 1));
+    else if (s.busy)
+        parts << tr("Generating: <b>%1 tok/s</b>").arg(formatNumber(qMax(0.0, s.genTps), 1));
+    else
+        parts << (m_status == Status::Running ? tr("Idle") : tr("Loading model"));
+    if (s.ctxSize > 0 && s.ctxUsed >= 0)
+        parts << tr("Context: %1 / %2 (%3 %)")
+                     .arg(s.ctxUsed).arg(s.ctxSize).arg(formatNumber(100.0 * s.ctxUsed / s.ctxSize, 0));
+    if (s.procRss >= 0)
+        parts << tr("llama-server uses %1 GiB RAM").arg(formatNumber(s.procRss / kGiB, 1));
+    ui->serverStatsLabel->setText(parts.join(QStringLiteral(" &middot; ")));
+
+    // Bottom bar: the live speed while generating, otherwise the last request's.
+    const double shown = s.busy && s.genTps > 0 ? s.genTps : s.lastGenTps;
+    ui->tpsMiniLabel->setVisible(shown >= 0);
+    if (shown >= 0)
+        ui->tpsMiniLabel->setText(tr("%1 tok/s").arg(formatNumber(shown, 1)));
 }
 
 void MainWindow::setupSystemTray()
@@ -270,16 +509,25 @@ void MainWindow::setStatus(Status status)
     QString html = QStringLiteral("<span style='color:%1'>&#9679;</span> <b>%2</b>").arg(color, text);
     if (status != Status::Stopped) {
         const QString url = serverUrl().toString();
-        html += QStringLiteral(" &mdash; %1 &mdash; <a href='%2'>%2</a>")
+        // Links must not wrap in the middle when the status line wraps.
+        html += QStringLiteral(" &mdash; %1 &mdash; <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
                     .arg(m_runningModelName.toHtmlEscaped(), url.toHtmlEscaped());
         const QString lan = lanUrl().toString();
         if (!lan.isEmpty())
-            html += QStringLiteral(" &middot; %1 <a href='%2'>%2</a>").arg(tr("network:"), lan.toHtmlEscaped());
+            html += QStringLiteral(" &middot; %1 <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
+                        .arg(tr("network:"), lan.toHtmlEscaped());
     }
     ui->statusLabel->setText(html);
     ui->statusLabel->setOpenExternalLinks(true);
 
     const bool ready = status == Status::Running;
+    if (ready && previous != Status::Running)
+        m_monitor->setServer(serverUrl(), ui->apiKeyEdit->text().trimmed());
+    else if (status == Status::Stopped) {
+        m_monitor->setServer(QUrl(), QString());
+        m_monitor->setProcessId(0);
+    }
+    updateMonitorActivity();
     ui->openBrowserButton->setEnabled(ready && m_runningWebUi);
     ui->copyUrlButton->setEnabled(status != Status::Stopped);
     ui->startButton->setText(running ? tr("Stop Llama Server") : tr("Start Llama Server"));
@@ -399,6 +647,53 @@ QStringList MainWindow::buildArguments() const
 
     if (ui->ctxShiftCheck->isChecked())
         arguments << "--context-shift";
+
+    // Advanced tab
+    if (const int kv = ui->kvCacheCombo->currentIndex(); kv > 0)
+        arguments << "-ctk" << kKvCacheTypes.at(kv) << "-ctv" << kKvCacheTypes.at(kv);
+    if (ui->kvOnCpuCheck->isChecked())
+        arguments << "--no-kv-offload";
+    if (ui->mlockCheck->isChecked())
+        arguments << "--mlock";
+    if (ui->noMmapCheck->isChecked())
+        arguments << "--no-mmap";
+    if (!ui->threadsAutoCheck->isChecked())
+        arguments << "-t" << QString::number(ui->threadsSpin->value());
+    if (!ui->batchAutoCheck->isChecked())
+        arguments << "-b" << QString::number(ui->batchSpin->value())
+                  << "-ub" << QString::number(ui->ubatchSpin->value());
+    if (!ui->parallelAutoCheck->isChecked())
+        arguments << "-np" << QString::number(ui->parallelSpin->value());
+
+    switch (ui->reasoningCombo->currentIndex()) {
+    case ReasoningOn: arguments << "--reasoning" << "on"; break;
+    case ReasoningOff: arguments << "--reasoning" << "off"; break;
+    default: break;
+    }
+    if (ui->reasoningCombo->currentIndex() != ReasoningOff && !ui->reasoningUnlimitedCheck->isChecked())
+        arguments << "--reasoning-budget" << QString::number(ui->reasoningBudgetSpin->value());
+    if (!ui->jinjaCheck->isChecked())
+        arguments << "--no-jinja";
+    if (ui->mmprojCheck->isChecked() && !m_mmprojPath.isEmpty()) {
+        arguments << "--mmproj" << m_mmprojPath;
+        if (ui->mmprojCpuCheck->isChecked())
+            arguments << "--no-mmproj-offload";
+    }
+
+    // QString::number() is locale-independent, as llama-server expects.
+    if (ui->tempCheck->isChecked())
+        arguments << "--temp" << QString::number(ui->tempSpin->value());
+    if (ui->topPCheck->isChecked())
+        arguments << "--top-p" << QString::number(ui->topPSpin->value());
+    if (ui->topKCheck->isChecked())
+        arguments << "--top-k" << QString::number(ui->topKSpin->value());
+    if (ui->minPCheck->isChecked())
+        arguments << "--min-p" << QString::number(ui->minPSpin->value());
+
+    if (ui->metricsCheck->isChecked())
+        arguments << "--metrics";
+    if (ui->noWarmupCheck->isChecked())
+        arguments << "--no-warmup";
     if (ui->noUiCheck->isChecked())
         arguments << "--no-ui";
     if (ui->lanAccessCheck->isChecked())
@@ -459,13 +754,15 @@ void MainWindow::startServer()
     m_process->setProcessEnvironment(env);
 
     ui->consoleOutput->clear();
-    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, arguments.join(QLatin1Char(' '))));
+    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, joinCommand(arguments)));
     setStatus(Status::Starting);
     m_process->start(exe, arguments); // asynchronous: started() / errorOccurred() follow
 }
 
 void MainWindow::handleProcessStarted()
 {
+    m_monitor->resetServerStats();
+    m_monitor->setProcessId(m_process->processId());
     setStatus(Status::Loading);
     m_healthTimer->start();
 }
@@ -498,7 +795,19 @@ void MainWindow::readProcessOutput()
             continue;
         ui->consoleOutput->appendPlainText(trimmed);
         m_lastOutputLine = trimmed;
+        m_monitor->feedLogLine(trimmed);
     }
+}
+
+void MainWindow::on_copyLogButton_clicked()
+{
+    QApplication::clipboard()->setText(ui->consoleOutput->toPlainText());
+    statusBar()->showMessage(tr("Log copied to clipboard"), 3000);
+}
+
+void MainWindow::on_clearLogButton_clicked()
+{
+    ui->consoleOutput->clear();
 }
 
 void MainWindow::handleProcessError(QProcess::ProcessError error)
@@ -512,6 +821,7 @@ void MainWindow::handleProcessError(QProcess::ProcessError error)
 
     const QString msg = tr("Could not start %1: %2").arg(serverExecutable(), processErrorText(error));
     ui->consoleOutput->appendPlainText(msg);
+    ui->tabWidget->setCurrentWidget(ui->logTab);
     m_healthTimer->stop();
     setStatus(Status::Stopped);
     notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
@@ -535,6 +845,7 @@ void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitSt
     setStatus(Status::Stopped);
 
     if (unexpected) {
+        ui->tabWidget->setCurrentWidget(ui->logTab); // the reason is in the server output
         QString msg = tr("Server stopped unexpectedly (exit code %1).").arg(exitCode);
         if (!m_lastOutputLine.isEmpty())
             msg += QLatin1Char('\n') + m_lastOutputLine.right(200);
@@ -657,6 +968,8 @@ void MainWindow::populateDevices(const QString &listOutput)
     while (it.hasNext()) {
         const auto m = it.next();
         const QString desc = m.captured(2).trimmed();
+        if (m_gpuName.isEmpty() && desc.contains(QLatin1String("AMD")))
+            m_gpuName = desc.section(QStringLiteral(" ("), 0, 0); // "AMD Radeon Pro WX Series"
         ui->deviceCombo->addItem(QStringLiteral("%1: %2").arg(m.captured(1), desc), m.captured(1));
         const auto fm = freeRe.match(desc);
         if (fm.hasMatch())
@@ -787,6 +1100,10 @@ void MainWindow::onModelChanged(int index)
 void MainWindow::updateModelInfo()
 {
     const QString path = m_currentModelPath;
+    m_mmprojPath = path.isEmpty() ? QString() : findMmproj(path);
+    ui->mmprojFileLabel->setText(m_mmprojPath.isEmpty()
+                                     ? tr("No mmproj*.gguf file next to the model.")
+                                     : QFileInfo(m_mmprojPath).fileName());
     if (path.isEmpty()) {
         m_modelInfo = GgufInfo();
         ui->modelInfoLabel->setText(tr("No model selected."));
@@ -876,6 +1193,27 @@ void MainWindow::updateUiState()
     ui->gpuLayersSpin->setDisabled(ui->gpuAutoCheck->isChecked());
     ui->contextSizeCombo->setDisabled(ui->contextAutoCheck->isChecked());
 
+    ui->threadsSpin->setDisabled(ui->threadsAutoCheck->isChecked());
+    ui->batchSpin->setDisabled(ui->batchAutoCheck->isChecked());
+    ui->ubatchSpin->setDisabled(ui->batchAutoCheck->isChecked());
+    ui->parallelSpin->setDisabled(ui->parallelAutoCheck->isChecked());
+    const bool thinking = ui->reasoningCombo->currentIndex() != ReasoningOff;
+    ui->labelReasoningBudget->setEnabled(thinking);
+    ui->reasoningUnlimitedCheck->setEnabled(thinking);
+    ui->reasoningBudgetSpin->setEnabled(thinking && !ui->reasoningUnlimitedCheck->isChecked());
+    ui->mmprojCheck->setEnabled(!m_mmprojPath.isEmpty());
+    ui->mmprojCpuCheck->setEnabled(!m_mmprojPath.isEmpty() && ui->mmprojCheck->isChecked());
+    ui->tempSpin->setEnabled(ui->tempCheck->isChecked());
+    ui->topPSpin->setEnabled(ui->topPCheck->isChecked());
+    ui->topKSpin->setEnabled(ui->topKCheck->isChecked());
+    ui->minPSpin->setEnabled(ui->minPCheck->isChecked());
+
+    const bool kvNeedsFa = ui->kvCacheCombo->currentIndex() > 0 && ui->flashAttnCombo->currentIndex() == FaOff;
+    ui->kvWarningLabel->setVisible(kvNeedsFa);
+    if (kvNeedsFa)
+        ui->kvWarningLabel->setText(QStringLiteral("<span style='color:#d35400'>&#9888; %1</span>")
+                                        .arg(tr("A quantized KV cache needs Flash Attention: set it to Auto or On on the Model tab.").toHtmlEscaped()));
+
     // MoE options only make sense for MoE models; keep them enabled if metadata is unknown.
     const bool moeApplicable = !m_modelInfo.valid || m_modelInfo.isMoe();
     ui->moeModeCombo->setEnabled(moeApplicable);
@@ -887,6 +1225,7 @@ void MainWindow::updateUiState()
     // Changing the model or binary while the server runs would not affect it; avoid confusion.
     ui->modelGroup->setEnabled(!running);
     ui->paramsGroup->setEnabled(!running);
+    ui->advancedGroup->setEnabled(!running);
     ui->deviceCombo->setEnabled(!running);
     ui->refreshDevicesButton->setEnabled(!running);
     ui->portSpin->setEnabled(!running);
@@ -964,6 +1303,33 @@ void MainWindow::saveModelSettings(const QString &modelPath)
     settings.setValue("flashAttn", ui->flashAttnCombo->currentIndex());
     settings.setValue("contextShift", ui->ctxShiftCheck->isChecked());
     settings.setValue("extraArgs", ui->extraArgsEdit->text());
+    settings.setValue("kvCache", kKvCacheTypes.at(qMax(0, ui->kvCacheCombo->currentIndex())));
+    settings.setValue("kvOnCpu", ui->kvOnCpuCheck->isChecked());
+    settings.setValue("mlock", ui->mlockCheck->isChecked());
+    settings.setValue("noMmap", ui->noMmapCheck->isChecked());
+    settings.setValue("threads", ui->threadsSpin->value());
+    settings.setValue("threadsAuto", ui->threadsAutoCheck->isChecked());
+    settings.setValue("batch", ui->batchSpin->value());
+    settings.setValue("ubatch", ui->ubatchSpin->value());
+    settings.setValue("batchAuto", ui->batchAutoCheck->isChecked());
+    settings.setValue("parallel", ui->parallelSpin->value());
+    settings.setValue("parallelAuto", ui->parallelAutoCheck->isChecked());
+    settings.setValue("reasoning", ui->reasoningCombo->currentIndex());
+    settings.setValue("reasoningBudget", ui->reasoningBudgetSpin->value());
+    settings.setValue("reasoningUnlimited", ui->reasoningUnlimitedCheck->isChecked());
+    settings.setValue("jinja", ui->jinjaCheck->isChecked());
+    settings.setValue("mmproj", ui->mmprojCheck->isChecked());
+    settings.setValue("mmprojCpu", ui->mmprojCpuCheck->isChecked());
+    settings.setValue("temp", ui->tempCheck->isChecked());
+    settings.setValue("tempValue", ui->tempSpin->value());
+    settings.setValue("topP", ui->topPCheck->isChecked());
+    settings.setValue("topPValue", ui->topPSpin->value());
+    settings.setValue("topK", ui->topKCheck->isChecked());
+    settings.setValue("topKValue", ui->topKSpin->value());
+    settings.setValue("minP", ui->minPCheck->isChecked());
+    settings.setValue("minPValue", ui->minPSpin->value());
+    settings.setValue("metrics", ui->metricsCheck->isChecked());
+    settings.setValue("noWarmup", ui->noWarmupCheck->isChecked());
     settings.endGroup();
 }
 
@@ -972,7 +1338,8 @@ void MainWindow::loadModelSettings(const QString &modelPath)
     QSettings settings;
     const QString group = modelSettingsGroup(modelPath);
     if (!settings.contains(group + QStringLiteral("/path"))) {
-        return; // first time with this model: keep the current values as its starting point
+        migrateExtraArgs(); // first time with this model: keep the current values as its starting point
+        return;
     }
     settings.beginGroup(group);
     const QString contextSize = settings.value("contextSize").toString();
@@ -987,7 +1354,131 @@ void MainWindow::loadModelSettings(const QString &modelPath)
     ui->flashAttnCombo->setCurrentIndex(qBound(0, settings.value("flashAttn", 0).toInt(), 2));
     ui->ctxShiftCheck->setChecked(settings.value("contextShift", false).toBool());
     ui->extraArgsEdit->setText(settings.value("extraArgs").toString());
+
+    // Settings saved before these options existed lack the keys; fall back to the defaults.
+    ui->kvCacheCombo->setCurrentIndex(qMax(0, kKvCacheTypes.indexOf(settings.value("kvCache").toString())));
+    ui->kvOnCpuCheck->setChecked(settings.value("kvOnCpu", false).toBool());
+    ui->mlockCheck->setChecked(settings.value("mlock", false).toBool());
+    ui->noMmapCheck->setChecked(settings.value("noMmap", false).toBool());
+    ui->threadsSpin->setValue(settings.value("threads", qMax(1, QThread::idealThreadCount() / 2)).toInt());
+    ui->threadsAutoCheck->setChecked(settings.value("threadsAuto", true).toBool());
+    ui->batchSpin->setValue(settings.value("batch", 2048).toInt());
+    ui->ubatchSpin->setValue(settings.value("ubatch", 512).toInt());
+    ui->batchAutoCheck->setChecked(settings.value("batchAuto", true).toBool());
+    ui->parallelSpin->setValue(settings.value("parallel", 1).toInt());
+    ui->parallelAutoCheck->setChecked(settings.value("parallelAuto", true).toBool());
+    ui->reasoningCombo->setCurrentIndex(qBound(0, settings.value("reasoning", 0).toInt(), 2));
+    ui->reasoningBudgetSpin->setValue(settings.value("reasoningBudget", 2048).toInt());
+    ui->reasoningUnlimitedCheck->setChecked(settings.value("reasoningUnlimited", true).toBool());
+    ui->jinjaCheck->setChecked(settings.value("jinja", true).toBool());
+    ui->mmprojCheck->setChecked(settings.value("mmproj", false).toBool());
+    ui->mmprojCpuCheck->setChecked(settings.value("mmprojCpu", false).toBool());
+    ui->tempCheck->setChecked(settings.value("temp", false).toBool());
+    ui->tempSpin->setValue(settings.value("tempValue", 0.8).toDouble());
+    ui->topPCheck->setChecked(settings.value("topP", false).toBool());
+    ui->topPSpin->setValue(settings.value("topPValue", 0.95).toDouble());
+    ui->topKCheck->setChecked(settings.value("topK", false).toBool());
+    ui->topKSpin->setValue(settings.value("topKValue", 40).toInt());
+    ui->minPCheck->setChecked(settings.value("minP", false).toBool());
+    ui->minPSpin->setValue(settings.value("minPValue", 0.05).toDouble());
+    ui->metricsCheck->setChecked(settings.value("metrics", false).toBool());
+    ui->noWarmupCheck->setChecked(settings.value("noWarmup", false).toBool());
     settings.endGroup();
+
+    migrateExtraArgs();
+}
+
+int MainWindow::migrateExtraArgs()
+{
+    const QStringList tokens = QProcess::splitCommand(ui->extraArgsEdit->text());
+    if (tokens.isEmpty())
+        return 0;
+
+    // Accept --flag=value as well as --flag value.
+    QStringList args;
+    for (const QString &t : tokens) {
+        const int eq = t.indexOf(QLatin1Char('='));
+        if (t.startsWith(QLatin1String("--")) && eq > 2)
+            args << t.left(eq) << t.mid(eq + 1);
+        else
+            args << t;
+    }
+
+    QStringList rest, kvTokens;
+    QString kvK, kvV;
+    int batch = 0, ubatch = 0, moved = 0;
+
+    for (int i = 0; i < args.size(); ++i) {
+        const QString &a = args.at(i);
+        const QString v = i + 1 < args.size() ? args.at(i + 1) : QString();
+        bool isInt = false, isNum = false;
+        const int iv = v.toInt(&isInt);
+        const double dv = v.toDouble(&isNum);
+        auto is = [&a](std::initializer_list<const char *> names) {
+            for (const char *n : names)
+                if (a == QLatin1String(n))
+                    return true;
+            return false;
+        };
+        auto flag = [&](QCheckBox *check, bool on) { check->setChecked(on); ++moved; };
+        auto valued = [&](auto apply) { apply(); ++i; ++moved; };
+
+        if (is({"-ctk", "--cache-type-k"}) && !v.isEmpty()) { kvK = v; kvTokens << a << v; ++i; }
+        else if (is({"-ctv", "--cache-type-v"}) && !v.isEmpty()) { kvV = v; kvTokens << a << v; ++i; }
+        else if (is({"-nkvo", "--no-kv-offload"})) flag(ui->kvOnCpuCheck, true);
+        else if (is({"-kvo", "--kv-offload"})) flag(ui->kvOnCpuCheck, false);
+        else if (is({"--mlock"})) flag(ui->mlockCheck, true);
+        else if (is({"--no-mmap"})) flag(ui->noMmapCheck, true);
+        else if (is({"--mmap"})) flag(ui->noMmapCheck, false);
+        else if (is({"-t", "--threads"}) && isInt)
+            valued([&] { ui->threadsAutoCheck->setChecked(iv <= 0); if (iv > 0) ui->threadsSpin->setValue(iv); });
+        else if (is({"-b", "--batch-size"}) && isInt && iv > 0) valued([&] { batch = iv; });
+        else if (is({"-ub", "--ubatch-size"}) && isInt && iv > 0) valued([&] { ubatch = iv; });
+        else if (is({"-np", "--parallel"}) && isInt)
+            valued([&] { ui->parallelAutoCheck->setChecked(iv <= 0); if (iv > 0) ui->parallelSpin->setValue(iv); });
+        else if (is({"-rea", "--reasoning"}) && (v == QLatin1String("on") || v == QLatin1String("off") || v == QLatin1String("auto")))
+            valued([&] { ui->reasoningCombo->setCurrentIndex(v == QLatin1String("on") ? ReasoningOn
+                                                             : v == QLatin1String("off") ? ReasoningOff : ReasoningAuto); });
+        else if (is({"--reasoning-budget"}) && isInt)
+            valued([&] { ui->reasoningUnlimitedCheck->setChecked(iv < 0); if (iv >= 0) ui->reasoningBudgetSpin->setValue(iv); });
+        else if (is({"--jinja"})) flag(ui->jinjaCheck, true);
+        else if (is({"--no-jinja"})) flag(ui->jinjaCheck, false);
+        else if (is({"--temp", "--temperature"}) && isNum)
+            valued([&] { ui->tempCheck->setChecked(true); ui->tempSpin->setValue(dv); });
+        else if (is({"--top-p"}) && isNum) valued([&] { ui->topPCheck->setChecked(true); ui->topPSpin->setValue(dv); });
+        else if (is({"--top-k"}) && isInt) valued([&] { ui->topKCheck->setChecked(true); ui->topKSpin->setValue(iv); });
+        else if (is({"--min-p"}) && isNum) valued([&] { ui->minPCheck->setChecked(true); ui->minPSpin->setValue(dv); });
+        else if (is({"--metrics"})) flag(ui->metricsCheck, true);
+        else if (is({"--no-warmup"})) flag(ui->noWarmupCheck, true);
+        else if (is({"--warmup"})) flag(ui->noWarmupCheck, false);
+        else if (is({"--context-shift"})) flag(ui->ctxShiftCheck, true);
+        else if (is({"--no-context-shift"})) flag(ui->ctxShiftCheck, false);
+        else if (is({"--no-mmproj-offload"})) flag(ui->mmprojCpuCheck, true);
+        else if (is({"--mmproj-offload"})) flag(ui->mmprojCpuCheck, false);
+        else rest << a;
+    }
+
+    // One combo sets both K and V, so only an identical pair of a type it offers can move.
+    const int kv = kKvCacheTypes.indexOf(kvK);
+    if (!kvTokens.isEmpty() && kvK == kvV && kv >= 0) {
+        ui->kvCacheCombo->setCurrentIndex(kv);
+        moved += 2;
+    } else {
+        rest << kvTokens;
+    }
+    if (batch || ubatch) {
+        ui->batchAutoCheck->setChecked(false);
+        if (batch)
+            ui->batchSpin->setValue(batch); // first: it bounds the micro-batch
+        if (ubatch)
+            ui->ubatchSpin->setValue(ubatch);
+    }
+
+    if (moved > 0) {
+        ui->extraArgsEdit->setText(joinCommand(rest));
+        statusBar()->showMessage(tr("Moved %n option(s) from Extra Arguments to the Advanced tab", nullptr, moved), 5000);
+    }
+    return moved;
 }
 
 void MainWindow::saveSettings()
@@ -1002,7 +1493,8 @@ void MainWindow::saveSettings()
     settings.setValue("lastModel", m_currentModelPath);
     settings.setValue("autoStartServer", ui->autoStartServerCheck->isChecked());
     settings.setValue("notifications", ui->notificationsCheck->isChecked());
-    settings.setValue("windowGeometry", saveGeometry());
+    settings.setValue("mainWindowGeometry", saveGeometry());
+    settings.setValue("currentTab", ui->tabWidget->currentIndex());
     if (!m_currentModelPath.isEmpty())
         saveModelSettings(m_currentModelPath);
 
@@ -1026,7 +1518,10 @@ void MainWindow::loadSettings()
     ui->autoStartServerCheck->setChecked(settings.value("autoStartServer", false).toBool());
     ui->notificationsCheck->setChecked(settings.value("notifications", true).toBool());
     ui->launchAtLoginCheck->setChecked(QFileInfo::exists(autostartFilePath()));
-    restoreGeometry(settings.value("windowGeometry").toByteArray());
+    // "windowGeometry" belonged to the single-page layout, which was much taller.
+    settings.remove("windowGeometry");
+    restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+    ui->tabWidget->setCurrentIndex(qBound(0, settings.value("currentTab", 0).toInt(), ui->tabWidget->count() - 1));
 
     // Older versions kept one global set of parameters (and a single "modelPath");
     // use them as the starting point for models that have no settings of their own yet.

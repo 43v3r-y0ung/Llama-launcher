@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "gguf.h"
+#include "monitor.h"
 
 #include <QMainWindow>
 #include <QProcess>
@@ -41,6 +42,8 @@ private slots:
     void on_openBrowserButton_clicked();
     void on_copyUrlButton_clicked();
     void on_generateKeyButton_clicked();
+    void on_copyLogButton_clicked();
+    void on_clearLogButton_clicked();
     void updateNetworkHint();
     void readProcessOutput();
     void handleProcessStarted();
@@ -58,6 +61,8 @@ private slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     enum class Status { Stopped, Starting, Loading, Running };
@@ -72,6 +77,7 @@ private:
     QNetworkAccessManager *m_networkManager;
     QTimer *m_healthTimer;
     QTimer *m_killTimer;         // force-kills the server if it ignores SIGTERM
+    Monitor *m_monitor;          // CPU/RAM/GPU and llama-server statistics
 
     Status m_status = Status::Stopped;
     QString m_runningModelName;
@@ -84,11 +90,16 @@ private:
 
     QString m_currentModelPath;  // model whose per-model settings are shown in the UI
     GgufInfo m_modelInfo;
+    QString m_mmprojPath;        // projector next to the current model, empty if none
     QString m_savedDevice;       // device id to select once the device list is loaded
+    QString m_gpuName;           // AMD GPU name as llama-server reports it, for the monitor
     int m_probeGeneration = 0;
     bool m_loading = false;      // suppresses change handlers while settings are applied
 
     void setupSystemTray();
+    void setupCharts();
+    void onMonitorSample(const MonitorSample &sample);
+    void updateMonitorActivity(); // sample only while someone can see it or the server runs
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
     void notify(const QString &title, const QString &message,
@@ -109,6 +120,7 @@ private:
     void updateModelInfo();
     void loadModelSettings(const QString &modelPath);
     void saveModelSettings(const QString &modelPath);
+    int migrateExtraArgs();       // moves flags that have their own control out of "Extra Arguments"
 
     static QString autostartFilePath();
     static void migrateLegacySettings();
