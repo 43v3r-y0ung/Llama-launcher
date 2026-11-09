@@ -1,6 +1,7 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -121,6 +122,10 @@ private:
     double m_promptProgress = -1;
     qint64 m_promptSeenMs = 0;      // last progress line; stale after a few seconds
     double m_lastGenTps = -1, m_lastPromptTps = -1;
+    // "n_gen = ..., tg_3s = ... t/s" progress lines, per slot: the server's own measurement of the
+    // last ~3 s. Printed only after 100 tokens and at most every 3 s; /slots covers the start.
+    struct GenProgress { double tps; qint64 seenMs; };
+    QHash<int, GenProgress> m_genProgress;
 };
 
 #endif // MONITOR_H

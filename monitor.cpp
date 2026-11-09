@@ -21,6 +21,7 @@ constexpr int kIntervalMs = 1000;
 constexpr int kGpuBusyIntervalMs = 200;
 constexpr qint64 kPromptStaleMs = 5000; // progress lines come every few seconds while processing
 constexpr double kGenSmoothing = 0.5;   // weight of the newest reading in the generation speed
+constexpr qint64 kGenProgressStaleMs = 6000; // n_gen lines come every >= 3 s while generating
 
 // Reads a small /proc or /sys file. Empty on failure (amdgpu answers EBUSY while the GPU sleeps).
 QByteArray readSmallFile(const QString &path)
@@ -124,6 +125,7 @@ void Monitor::resetServerStats()
     m_promptTps = 0;
     m_promptProgress = -1;
     m_lastGenTps = m_lastPromptTps = -1;
+    m_genProgress.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +147,20 @@ void Monitor::sample()
         const bool prompting = m_promptProgress >= 0 && s.timeMs - m_promptSeenMs < kPromptStaleMs;
         s.promptTps = prompting ? m_promptTps : 0;
         s.promptProgress = prompting ? m_promptProgress : -1;
-        s.genTps = m_serverUrl.isEmpty() ? 0 : m_genTps;
-        s.busy = m_busy || prompting;
+        // Prefer the server's own generation speed from the log; fall back to the /slots estimate.
+        double logTps = 0;
+        bool logGenerating = false;
+        for (auto it = m_genProgress.begin(); it != m_genProgress.end();) {
+            if (s.timeMs - it->seenMs >= kGenProgressStaleMs) {
+                it = m_genProgress.erase(it);
+                continue;
+            }
+            logTps += it->tps;
+            logGenerating = true;
+            ++it;
+        }
+        s.genTps = logGenerating ? logTps : (m_serverUrl.isEmpty() ? 0 : m_genTps);
+        s.busy = m_busy || prompting || logGenerating;
         s.ctxUsed = m_ctxUsed;
         s.ctxSize = m_ctxSize;
         s.lastGenTps = m_lastGenTps;
@@ -378,6 +392,22 @@ void Monitor::feedLogLine(const QString &line)
     static const QRegularExpression timingRe(
         QStringLiteral("(prompt )?eval time =\\s*[\\d.]+ ms /\\s*\\d+ tokens \\(\\s*[\\d.]+ ms per token,\\s*([\\d.]+) tokens per second\\)"));
 
+    // slot print_timing: id  1 | task 118 | n_gen =    440, tg =   7.96 t/s, tg_3s =   7.92 t/s
+    static const QRegularExpression genRe(
+        QStringLiteral("n_gen =\\s*\\d+, tg =\\s*[\\d.]+ t/s, tg_3s =\\s*([\\d.]+) t/s"));
+    static const QRegularExpression slotRe(QStringLiteral("\\bid\\s+(\\d+) \\|"));
+    auto slotId = [&line] {
+        const QRegularExpressionMatch m = slotRe.match(line);
+        return m.hasMatch() ? m.captured(1).toInt() : 0;
+    };
+
+    if (line.contains(QLatin1String("tg_3s"))) {
+        if (const QRegularExpressionMatch m = genRe.match(line); m.hasMatch()) {
+            m_genProgress.insert(slotId(), {m.captured(1).toDouble(), QDateTime::currentMSecsSinceEpoch()});
+            m_promptProgress = -1; // generating, so the prompt is done
+        }
+        return;
+    }
     if (!line.contains(QLatin1String("tokens per second")))
         return;
 
@@ -394,6 +424,7 @@ void Monitor::feedLogLine(const QString &line)
             m_promptProgress = -1; // prompt done, generation follows
         } else {
             m_lastGenTps = tps;
+            m_genProgress.remove(slotId()); // request finished: its live speed ends now
         }
     }
 }
