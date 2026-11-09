@@ -41,6 +41,8 @@ private slots:
     void on_openBrowserButton_clicked();
     void on_copyUrlButton_clicked();
     void on_generateKeyButton_clicked();
+    void on_copyLogButton_clicked();
+    void on_clearLogButton_clicked();
     void updateNetworkHint();
     void readProcessOutput();
     void handleProcessStarted();

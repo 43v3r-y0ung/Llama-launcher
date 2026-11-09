@@ -6,175 +6,26 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>820</width>
-    <height>900</height>
+    <width>760</width>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Llama Launcher</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0">
     <item>
-     <widget class="QGroupBox" name="serverGroup">
-      <property name="title">
-       <string>Server</string>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
       </property>
-      <layout class="QGridLayout" name="serverGrid">
-       <item row="0" column="0">
-        <widget class="QLabel" name="labelServer">
-         <property name="text">
-          <string>llama-server:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QLineEdit" name="serverPathEdit">
-         <property name="placeholderText">
-          <string>llama-server (from PATH)</string>
-         </property>
-         <property name="toolTip">
-          <string>Path to the llama-server executable. Leave empty to use the one found in PATH.</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QPushButton" name="serverBrowseButton">
-         <property name="text">
-          <string>Browse...</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1" colspan="2">
-        <widget class="QLabel" name="serverVersionLabel">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="textInteractionFlags">
-          <set>Qt::TextInteractionFlag::TextSelectableByMouse</set>
-         </property>
-         <property name="textFormat">
-          <enum>Qt::TextFormat::RichText</enum>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="labelDevice">
-         <property name="text">
-          <string>Device:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QComboBox" name="deviceCombo">
-         <property name="toolTip">
-          <string>Device used for offloading (passed as --device). "All GPUs" lets llama-server split the model across every detected device, which is usually slower when one of them is an integrated GPU.</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="QPushButton" name="refreshDevicesButton">
-         <property name="text">
-          <string>Refresh</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>Port:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <layout class="QHBoxLayout" name="portLayout" stretch="0,1">
-         <item>
-          <widget class="QSpinBox" name="portSpin">
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>65535</number>
-           </property>
-           <property name="value">
-            <number>8080</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="noUiCheck">
-           <property name="text">
-            <string>Disable Web UI</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="4" column="0">
-        <widget class="QLabel" name="labelNetwork">
-         <property name="text">
-          <string>Network:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1">
-        <layout class="QHBoxLayout" name="networkLayout" stretch="0,0,1">
-         <item>
-          <widget class="QCheckBox" name="lanAccessCheck">
-           <property name="text">
-            <string>Allow access from local network</string>
-           </property>
-           <property name="toolTip">
-            <string>Listen on all network interfaces (--host 0.0.0.0) so other computers on your network can use the server.</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelApiKey">
-           <property name="text">
-            <string>API key:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="apiKeyEdit">
-           <property name="echoMode">
-            <enum>QLineEdit::EchoMode::PasswordEchoOnEdit</enum>
-           </property>
-           <property name="placeholderText">
-            <string>none</string>
-           </property>
-           <property name="toolTip">
-            <string>Clients must send this key (Authorization: Bearer &lt;key&gt;; the Web UI asks for it in its settings). Leave empty for no key.</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item row="4" column="2">
-        <widget class="QPushButton" name="generateKeyButton">
-         <property name="text">
-          <string>Generate</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="1" colspan="2">
-        <widget class="QLabel" name="networkHintLabel">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-         <property name="textFormat">
-          <enum>Qt::TextFormat::RichText</enum>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item>
+     <widget class="QWidget" name="modelTab">
+      <attribute name="title">
+       <string>Model</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="modelTabLayout">
+       <item>
      <widget class="QGroupBox" name="modelGroup">
       <property name="title">
        <string>Model</string>
@@ -211,7 +62,7 @@
        <item row="1" column="1">
         <widget class="QComboBox" name="modelCombo">
          <property name="toolTip">
-          <string>Models found in the models folder plus recently used ones. Settings below are remembered per model.</string>
+          <string>Models found in the models folder plus recently used ones. Parameters on the Model and Advanced tabs are remembered per model.</string>
          </property>
         </widget>
        </item>
@@ -250,8 +101,8 @@
        </item>
       </layout>
      </widget>
-    </item>
-    <item>
+       </item>
+       <item>
      <widget class="QGroupBox" name="paramsGroup">
       <property name="title">
        <string>Parameters (remembered per model)</string>
@@ -418,14 +269,205 @@
          </item>
         </widget>
        </item>
+      </layout>
+     </widget>
+       </item>
+      <item>
+       <spacer name="modelTabSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+       </spacer>
+      </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="serverTab">
+      <attribute name="title">
+       <string>Server</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="serverTabLayout">
+       <item>
+      <layout class="QGridLayout" name="serverGrid">
+       <item row="0" column="0">
+        <widget class="QLabel" name="labelServer">
+         <property name="text">
+          <string>llama-server:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="serverPathEdit">
+         <property name="placeholderText">
+          <string>llama-server (from PATH)</string>
+         </property>
+         <property name="toolTip">
+          <string>Path to the llama-server executable. Leave empty to use the one found in PATH.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="serverBrowseButton">
+         <property name="text">
+          <string>Browse...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1" colspan="2">
+        <widget class="QLabel" name="serverVersionLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="textInteractionFlags">
+          <set>Qt::TextInteractionFlag::TextSelectableByMouse</set>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelDevice">
+         <property name="text">
+          <string>Device:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="deviceCombo">
+         <property name="toolTip">
+          <string>Device used for offloading (passed as --device). "All GPUs" lets llama-server split the model across every detected device, which is usually slower when one of them is an integrated GPU.</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QPushButton" name="refreshDevicesButton">
+         <property name="text">
+          <string>Refresh</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Port:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <layout class="QHBoxLayout" name="portLayout" stretch="0,1">
+         <item>
+          <widget class="QSpinBox" name="portSpin">
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>65535</number>
+           </property>
+           <property name="value">
+            <number>8080</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="noUiCheck">
+           <property name="text">
+            <string>Disable Web UI</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
        <item row="4" column="0">
+        <widget class="QLabel" name="labelNetwork">
+         <property name="text">
+          <string>Network:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <layout class="QHBoxLayout" name="networkLayout" stretch="0,0,1">
+         <item>
+          <widget class="QCheckBox" name="lanAccessCheck">
+           <property name="text">
+            <string>Allow access from local network</string>
+           </property>
+           <property name="toolTip">
+            <string>Listen on all network interfaces (--host 0.0.0.0) so other computers on your network can use the server.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelApiKey">
+           <property name="text">
+            <string>API key:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="apiKeyEdit">
+           <property name="echoMode">
+            <enum>QLineEdit::EchoMode::PasswordEchoOnEdit</enum>
+           </property>
+           <property name="placeholderText">
+            <string>none</string>
+           </property>
+           <property name="toolTip">
+            <string>Clients must send this key (Authorization: Bearer &lt;key&gt;; the Web UI asks for it in its settings). Leave empty for no key.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="4" column="2">
+        <widget class="QPushButton" name="generateKeyButton">
+         <property name="text">
+          <string>Generate</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QLabel" name="networkHintLabel">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+        </widget>
+       </item>
+      </layout>
+       </item>
+      <item>
+       <spacer name="serverTabSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+       </spacer>
+      </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="advancedTab">
+      <attribute name="title">
+       <string>Advanced</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="advancedTabLayout">
+       <item>
+     <widget class="QGroupBox" name="advancedGroup">
+      <property name="title">
+       <string>Advanced (remembered per model)</string>
+      </property>
+      <layout class="QGridLayout" name="advancedGrid">
+       <item row="0" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
           <string>Extra Arguments:</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="0" column="1">
         <widget class="QLineEdit" name="extraArgsEdit">
          <property name="placeholderText">
           <string>e.g. --jinja --temp 0.7</string>
@@ -435,7 +477,7 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="1">
+       <item row="1" column="1">
         <widget class="QCheckBox" name="ctxShiftCheck">
          <property name="text">
           <string>Context Shift</string>
@@ -444,13 +486,63 @@
        </item>
       </layout>
      </widget>
-    </item>
-    <item>
-     <widget class="QGroupBox" name="launcherGroup">
-      <property name="title">
+       </item>
+      <item>
+       <spacer name="advancedTabSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+       </spacer>
+      </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="logTab">
+      <attribute name="title">
+       <string>Log</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="logTabLayout">
+       <item>
+        <widget class="QPlainTextEdit" name="consoleOutput">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Console output will appear here...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="logButtonsLayout">
+         <item>
+          <spacer name="logButtonsSpacer">
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="copyLogButton">
+           <property name="text">
+            <string>Copy Log</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="clearLogButton">
+           <property name="text">
+            <string>Clear</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="launcherTab">
+      <attribute name="title">
        <string>Launcher</string>
-      </property>
-      <layout class="QHBoxLayout" name="launcherLayout">
+      </attribute>
+      <layout class="QVBoxLayout" name="launcherLayout">
        <item>
         <widget class="QCheckBox" name="launchAtLoginCheck">
          <property name="text">
@@ -475,14 +567,15 @@
          </property>
         </widget>
        </item>
-       <item>
-        <spacer name="launcherSpacer">
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-        </spacer>
-       </item>
+      <item>
+       <spacer name="launcherTabSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Vertical</enum>
+        </property>
+       </spacer>
+      </item>
       </layout>
+     </widget>
      </widget>
     </item>
     <item>
@@ -525,16 +618,6 @@
        </widget>
       </item>
      </layout>
-    </item>
-    <item>
-     <widget class="QPlainTextEdit" name="consoleOutput">
-      <property name="readOnly">
-       <bool>true</bool>
-      </property>
-      <property name="placeholderText">
-       <string>Console output will appear here...</string>
-      </property>
-     </widget>
     </item>
    </layout>
   </widget>

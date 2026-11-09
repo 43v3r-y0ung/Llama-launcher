@@ -74,6 +74,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->openBrowserButton->setIcon(QIcon::fromTheme(QStringLiteral("internet-web-browser")));
     ui->copyUrlButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->refreshDevicesButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
+    ui->copyLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
+    ui->clearLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-clear-history")));
 
     connect(ui->gpuAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
     connect(ui->contextAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
@@ -501,6 +503,17 @@ void MainWindow::readProcessOutput()
     }
 }
 
+void MainWindow::on_copyLogButton_clicked()
+{
+    QApplication::clipboard()->setText(ui->consoleOutput->toPlainText());
+    statusBar()->showMessage(tr("Log copied to clipboard"), 3000);
+}
+
+void MainWindow::on_clearLogButton_clicked()
+{
+    ui->consoleOutput->clear();
+}
+
 void MainWindow::handleProcessError(QProcess::ProcessError error)
 {
     // Crashed is followed by finished(), which reports it; only FailedToStart ends here.
@@ -512,6 +525,7 @@ void MainWindow::handleProcessError(QProcess::ProcessError error)
 
     const QString msg = tr("Could not start %1: %2").arg(serverExecutable(), processErrorText(error));
     ui->consoleOutput->appendPlainText(msg);
+    ui->tabWidget->setCurrentWidget(ui->logTab);
     m_healthTimer->stop();
     setStatus(Status::Stopped);
     notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
@@ -535,6 +549,7 @@ void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitSt
     setStatus(Status::Stopped);
 
     if (unexpected) {
+        ui->tabWidget->setCurrentWidget(ui->logTab); // the reason is in the server output
         QString msg = tr("Server stopped unexpectedly (exit code %1).").arg(exitCode);
         if (!m_lastOutputLine.isEmpty())
             msg += QLatin1Char('\n') + m_lastOutputLine.right(200);
@@ -887,6 +902,7 @@ void MainWindow::updateUiState()
     // Changing the model or binary while the server runs would not affect it; avoid confusion.
     ui->modelGroup->setEnabled(!running);
     ui->paramsGroup->setEnabled(!running);
+    ui->advancedGroup->setEnabled(!running);
     ui->deviceCombo->setEnabled(!running);
     ui->refreshDevicesButton->setEnabled(!running);
     ui->portSpin->setEnabled(!running);
@@ -1002,7 +1018,8 @@ void MainWindow::saveSettings()
     settings.setValue("lastModel", m_currentModelPath);
     settings.setValue("autoStartServer", ui->autoStartServerCheck->isChecked());
     settings.setValue("notifications", ui->notificationsCheck->isChecked());
-    settings.setValue("windowGeometry", saveGeometry());
+    settings.setValue("mainWindowGeometry", saveGeometry());
+    settings.setValue("currentTab", ui->tabWidget->currentIndex());
     if (!m_currentModelPath.isEmpty())
         saveModelSettings(m_currentModelPath);
 
@@ -1026,7 +1043,10 @@ void MainWindow::loadSettings()
     ui->autoStartServerCheck->setChecked(settings.value("autoStartServer", false).toBool());
     ui->notificationsCheck->setChecked(settings.value("notifications", true).toBool());
     ui->launchAtLoginCheck->setChecked(QFileInfo::exists(autostartFilePath()));
-    restoreGeometry(settings.value("windowGeometry").toByteArray());
+    // "windowGeometry" belonged to the single-page layout, which was much taller.
+    settings.remove("windowGeometry");
+    restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+    ui->tabWidget->setCurrentIndex(qBound(0, settings.value("currentTab", 0).toInt(), ui->tabWidget->count() - 1));
 
     // Older versions kept one global set of parameters (and a single "modelPath");
     // use them as the starting point for models that have no settings of their own yet.
