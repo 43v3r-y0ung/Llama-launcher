@@ -89,6 +89,20 @@ void ChartWidget::setMaximum(double max)
     update();
 }
 
+void ChartWidget::setCaption(const QString &caption)
+{
+    if (caption == m_caption)
+        return;
+    m_caption = caption;
+    update();
+}
+
+void ChartWidget::setSizingText(const QString &text)
+{
+    m_sizingText = text;
+    updateGeometry();
+}
+
 void ChartWidget::setCapacity(int samples)
 {
     m_capacity = qMax(2, samples);
@@ -109,7 +123,7 @@ QSize ChartWidget::sizeHint() const
 {
     if (m_mode == Mode::Mini)
         // left padding, caption, gap (1.5 pads), sparkline, right padding
-        return {fontMetrics().horizontalAdvance(QStringLiteral("GPU 100 %")) + kMiniSparkWidth + 4 * kPad,
+        return {fontMetrics().horizontalAdvance(m_sizingText) + kMiniSparkWidth + 4 * kPad,
                 fontMetrics().height() + kPad};
     return {240, 120};
 }
@@ -273,7 +287,8 @@ void ChartWidget::paintEvent(QPaintEvent *)
         p.setPen(pal.color(QPalette::Text));
         const QRectF textRect(kPad, 0, plot.left() - 1.5 * kPad, height());
         p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
-                   fm.elidedText(m_title + QLatin1Char(' ') + format(v), Qt::ElideRight, int(textRect.width())));
+                   fm.elidedText(m_caption.isEmpty() ? m_title + QLatin1Char(' ') + format(v) : m_caption,
+                                 Qt::ElideRight, int(textRect.width())));
         paintSeries(p, plot, max, true);
         return;
     }

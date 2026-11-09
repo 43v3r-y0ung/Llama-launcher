@@ -28,6 +28,8 @@ public:
     void setFormatter(std::function<QString(double)> f); // value -> text, e.g. "34 %"
     void setMaximum(double max);                         // fixed y-range 0..max; <= 0 scales automatically
     void setCapacity(int samples);                       // x-range in samples
+    void setCaption(const QString &caption);             // mini mode: text instead of "title value"
+    void setSizingText(const QString &text);             // mini mode: widest caption to reserve room for
     void setData(const QList<QList<double>> &series);    // oldest first, one value per second
 
     QSize sizeHint() const override;
@@ -56,6 +58,8 @@ private:
     std::function<QString(double)> m_formatter;
     double m_maximum = 0;
     int m_capacity = 300;
+    QString m_caption;
+    QString m_sizingText = QStringLiteral("GPU 100 %");
     QList<QList<double>> m_series;
     int m_hoverIndex = -1;
 };

@@ -1132,7 +1132,7 @@
               <widget class="ChartWidget" name="gpuMini"/>
             </item>
             <item>
-              <widget class="QLabel" name="tpsMiniLabel"/>
+              <widget class="ChartWidget" name="tpsMini"/>
             </item>
           </layout>
         </item>

@@ -286,10 +286,25 @@ void MainWindow::setupCharts()
     for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini}) {
         mini->setFormatter(percent);
         mini->setMaximum(100);
-        mini->setCapacity(kMiniChartSamples);
         mini->setToolTip(tr("Last minute; details on the Monitor tab"));
     }
-    ui->tpsMiniLabel->setVisible(false);
+    ui->tpsMini->setMode(ChartWidget::Mode::Mini);
+    ui->tpsMini->setFormatter(tps);
+    ui->tpsMini->setCaption(tr("— tok/s"));
+    ui->tpsMini->setToolTip(tr("Generation speed, last minute; the caption shows the last request when idle"));
+
+    // Same fixed width for all three, sized for the widest caption, so the Start button never resizes.
+    const QFontMetrics fm = ui->tpsMini->fontMetrics();
+    const QString gpuCaption = tr("GPU") + QLatin1Char(' ') + percent(100);
+    const QString widest = fm.horizontalAdvance(tps(99.9)) > fm.horizontalAdvance(gpuCaption) ? tps(99.9) : gpuCaption;
+    int width = 0;
+    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini, ui->tpsMini}) {
+        mini->setCapacity(kMiniChartSamples);
+        mini->setSizingText(widest);
+        width = qMax(width, mini->sizeHint().width());
+    }
+    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini, ui->tpsMini})
+        mini->setFixedWidth(width);
     ui->serverStatsLabel->setText(tr("The server is not running."));
 }
 
@@ -364,9 +379,13 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
         last << tr("prompt %1 tok/s").arg(formatNumber(s.lastPromptTps, 1));
     ui->tpsChart->setSubtitle(last.isEmpty() ? QString() : tr("Last request: %1").arg(last.join(QStringLiteral(", "))));
 
+    // Bottom bar: the live speed while generating, otherwise the last request's.
+    ui->tpsMini->setData({gen.mid(qMax(0, gen.size() - kMiniChartSamples))});
+    const double shown = !running ? -1 : (s.busy && s.genTps > 0 ? s.genTps : s.lastGenTps);
+    ui->tpsMini->setCaption(shown >= 0 ? tr("%1 tok/s").arg(formatNumber(shown, 1)) : tr("— tok/s"));
+
     if (!running) {
         ui->serverStatsLabel->setText(tr("The server is not running."));
-        ui->tpsMiniLabel->setVisible(false);
         return;
     }
     QStringList parts;
@@ -383,12 +402,6 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
     if (s.procRss >= 0)
         parts << tr("llama-server uses %1 GiB RAM").arg(formatNumber(s.procRss / kGiB, 1));
     ui->serverStatsLabel->setText(parts.join(QStringLiteral(" &middot; ")));
-
-    // Bottom bar: the live speed while generating, otherwise the last request's.
-    const double shown = s.busy && s.genTps > 0 ? s.genTps : s.lastGenTps;
-    ui->tpsMiniLabel->setVisible(shown >= 0);
-    if (shown >= 0)
-        ui->tpsMiniLabel->setText(tr("%1 tok/s").arg(formatNumber(shown, 1)));
 }
 
 void MainWindow::setupSystemTray()

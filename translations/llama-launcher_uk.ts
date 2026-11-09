@@ -4,12 +4,12 @@
 <context>
     <name>ChartWidget</name>
     <message>
-        <location filename="../chartwidget.cpp" line="299"/>
+        <location filename="../chartwidget.cpp" line="314"/>
         <source>%1 s ago: </source>
         <translation>%1 с тому: </translation>
     </message>
     <message numerus="yes">
-        <location filename="../chartwidget.cpp" line="346"/>
+        <location filename="../chartwidget.cpp" line="361"/>
         <source>%n min</source>
         <translation>
             <numerusform>%n хв</numerusform>
@@ -18,7 +18,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../chartwidget.cpp" line="346"/>
+        <location filename="../chartwidget.cpp" line="361"/>
         <source>%n s</source>
         <translation>
             <numerusform>%n с</numerusform>
@@ -31,9 +31,9 @@
     <name>MainWindow</name>
     <message>
         <location filename="../mainwindow.ui" line="14"/>
-        <location filename="../mainwindow.cpp" line="409"/>
-        <location filename="../mainwindow.cpp" line="723"/>
-        <location filename="../mainwindow.cpp" line="731"/>
+        <location filename="../mainwindow.cpp" line="422"/>
+        <location filename="../mainwindow.cpp" line="736"/>
+        <location filename="../mainwindow.cpp" line="744"/>
         <source>Llama Launcher</source>
         <translation>Llama Launcher</translation>
     </message>
@@ -510,13 +510,13 @@
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1121"/>
-        <location filename="../mainwindow.cpp" line="533"/>
+        <location filename="../mainwindow.cpp" line="546"/>
         <source>Start Llama Server</source>
         <translation>Запустити сервер</translation>
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1160"/>
-        <location filename="../mainwindow.cpp" line="402"/>
+        <location filename="../mainwindow.cpp" line="415"/>
         <source>Open in Browser</source>
         <translation>Відкрити в браузері</translation>
     </message>
@@ -566,38 +566,38 @@
         <translation>Сервер не зупинився вчасно — примусове завершення.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="400"/>
+        <location filename="../mainwindow.cpp" line="413"/>
         <source>Start Server</source>
         <translation>Запустити сервер</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="401"/>
+        <location filename="../mainwindow.cpp" line="414"/>
         <source>Stop Server</source>
         <translation>Зупинити сервер</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="404"/>
+        <location filename="../mainwindow.cpp" line="417"/>
         <source>Show/Restore</source>
         <translation>Показати/сховати</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="406"/>
+        <location filename="../mainwindow.cpp" line="419"/>
         <source>Exit</source>
         <translation>Вийти</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="503"/>
+        <location filename="../mainwindow.cpp" line="516"/>
         <source>Stopped</source>
         <translation>Зупинено</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="504"/>
+        <location filename="../mainwindow.cpp" line="517"/>
         <source>Starting</source>
         <translation>Запуск</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="379"/>
-        <location filename="../mainwindow.cpp" line="505"/>
+        <location filename="../mainwindow.cpp" line="398"/>
+        <location filename="../mainwindow.cpp" line="518"/>
         <source>Loading model</source>
         <translation>Завантаження моделі</translation>
     </message>
@@ -608,7 +608,7 @@
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="258"/>
-        <location filename="../mainwindow.cpp" line="391"/>
+        <location filename="../mainwindow.cpp" line="385"/>
         <source>%1 tok/s</source>
         <translation>%1 ток/с</translation>
     </message>
@@ -646,109 +646,121 @@
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="285"/>
+        <location filename="../mainwindow.cpp" line="298"/>
         <source>GPU</source>
         <translation>GPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="290"/>
+        <location filename="../mainwindow.cpp" line="289"/>
         <source>Last minute; details on the Monitor tab</source>
         <translation>Остання хвилина; докладніше на вкладці «Монітор»</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="293"/>
-        <location filename="../mainwindow.cpp" line="368"/>
+        <location filename="../mainwindow.cpp" line="385"/>
+        <source>— tok/s</source>
+        <translation>— ток/с</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="294"/>
+        <source>Generation speed, last minute; the caption shows the last request when idle</source>
+        <translation>Швидкість генерації за останню хвилину; поки сервер чекає, підпис показує останній запит</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="308"/>
+        <location filename="../mainwindow.cpp" line="388"/>
         <source>The server is not running.</source>
         <translation>Сервер не запущено.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="334"/>
+        <location filename="../mainwindow.cpp" line="349"/>
         <source>%1, last minute; details on the Monitor tab</source>
         <translation>%1, остання хвилина; докладніше на вкладці «Монітор»</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="339"/>
+        <location filename="../mainwindow.cpp" line="354"/>
         <source>sleeping (power saving)</source>
         <translation>сплячий режим (енергозбереження)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="344"/>
+        <location filename="../mainwindow.cpp" line="359"/>
         <source>%1 W</source>
         <translation>%1 Вт</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="346"/>
+        <location filename="../mainwindow.cpp" line="361"/>
         <source>%1 MHz</source>
         <translation>%1 МГц</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="353"/>
+        <location filename="../mainwindow.cpp" line="368"/>
         <source>Shared system memory (GTT): %1 GiB</source>
         <translation>Спільна системна пам’ять (GTT): %1 ГіБ</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="362"/>
+        <location filename="../mainwindow.cpp" line="377"/>
         <source>generation %1 tok/s</source>
         <translation>генерація %1 ток/с</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="364"/>
+        <location filename="../mainwindow.cpp" line="379"/>
         <source>prompt %1 tok/s</source>
         <translation>промпт %1 ток/с</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="365"/>
+        <location filename="../mainwindow.cpp" line="380"/>
         <source>Last request: %1</source>
         <translation>Останній запит: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="374"/>
+        <location filename="../mainwindow.cpp" line="393"/>
         <source>Reading prompt: &lt;b&gt;%1 %&lt;/b&gt; at %2 tok/s</source>
         <translation>Обробка промпту: &lt;b&gt;%1 %&lt;/b&gt;, %2 ток/с</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="377"/>
+        <location filename="../mainwindow.cpp" line="396"/>
         <source>Generating: &lt;b&gt;%1 tok/s&lt;/b&gt;</source>
         <translation>Генерація: &lt;b&gt;%1 ток/с&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="379"/>
+        <location filename="../mainwindow.cpp" line="398"/>
         <source>Idle</source>
         <translation>Очікує запитів</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="381"/>
+        <location filename="../mainwindow.cpp" line="400"/>
         <source>Context: %1 / %2 (%3 %)</source>
         <translation>Контекст: %1 / %2 (%3 %)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="384"/>
+        <location filename="../mainwindow.cpp" line="403"/>
         <source>llama-server uses %1 GiB RAM</source>
         <translation>llama-server займає %1 ГіБ ОЗП</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="506"/>
+        <location filename="../mainwindow.cpp" line="519"/>
         <source>Running</source>
         <translation>Працює</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="518"/>
+        <location filename="../mainwindow.cpp" line="531"/>
         <source>network:</source>
         <translation>мережа:</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="533"/>
+        <location filename="../mainwindow.cpp" line="546"/>
         <source>Stop Llama Server</source>
         <translation>Зупинити сервер</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="539"/>
+        <location filename="../mainwindow.cpp" line="552"/>
         <source>Llama Launcher
 Status: %1</source>
         <translation>Llama Launcher
 Стан: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="541"/>
+        <location filename="../mainwindow.cpp" line="554"/>
         <source>
 Model: %1
 %2</source>
@@ -757,179 +769,179 @@ Model: %1
 %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="549"/>
+        <location filename="../mainwindow.cpp" line="562"/>
         <source>Llama server is ready</source>
         <translation>Сервер готовий</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="550"/>
+        <location filename="../mainwindow.cpp" line="563"/>
         <source>%1
 %2</source>
         <translation>%1
 %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="567"/>
+        <location filename="../mainwindow.cpp" line="580"/>
         <source>Copied %1</source>
         <translation>Скопійовано %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="588"/>
+        <location filename="../mainwindow.cpp" line="601"/>
         <source>no network connection found</source>
         <translation>мережеве з’єднання не знайдено</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="590"/>
+        <location filename="../mainwindow.cpp" line="603"/>
         <source>Other computers can connect at %1</source>
         <translation>Інші комп’ютери можуть підключатися за адресою %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="593"/>
+        <location filename="../mainwindow.cpp" line="606"/>
         <source>No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi.</source>
         <translation>Ключа API немає: будь-хто в мережі зможе користуватися сервером. Задайте ключ, особливо в публічних Wi-Fi.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="721"/>
-        <location filename="../mainwindow.cpp" line="729"/>
-        <location filename="../mainwindow.cpp" line="1270"/>
+        <location filename="../mainwindow.cpp" line="734"/>
+        <location filename="../mainwindow.cpp" line="742"/>
+        <location filename="../mainwindow.cpp" line="1283"/>
         <source>Warning</source>
         <translation>Попередження</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="721"/>
-        <location filename="../mainwindow.cpp" line="723"/>
+        <location filename="../mainwindow.cpp" line="734"/>
+        <location filename="../mainwindow.cpp" line="736"/>
         <source>Please select a model first.</source>
         <translation>Спочатку виберіть модель.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="727"/>
+        <location filename="../mainwindow.cpp" line="740"/>
         <source>Model file not found:
 %1</source>
         <translation>Файл моделі не знайдено:
 %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="757"/>
+        <location filename="../mainwindow.cpp" line="770"/>
         <source>Starting %1 %2</source>
         <translation>Запуск %1 %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="774"/>
+        <location filename="../mainwindow.cpp" line="787"/>
         <source>Stopping server...</source>
         <translation>Зупинка сервера...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="805"/>
+        <location filename="../mainwindow.cpp" line="818"/>
         <source>Log copied to clipboard</source>
         <translation>Журнал скопійовано в буфер обміну</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="818"/>
+        <location filename="../mainwindow.cpp" line="831"/>
         <source>Process error: %1</source>
         <translation>Помилка процесу: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="822"/>
+        <location filename="../mainwindow.cpp" line="835"/>
         <source>Could not start %1: %2</source>
         <translation>Не вдалося запустити %1: %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="827"/>
+        <location filename="../mainwindow.cpp" line="840"/>
         <source>Llama server failed to start</source>
         <translation>Сервер не запустився</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="841"/>
+        <location filename="../mainwindow.cpp" line="854"/>
         <source>Server crashed.</source>
         <translation>Сервер аварійно завершився.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="843"/>
+        <location filename="../mainwindow.cpp" line="856"/>
         <source>Server stopped (exit code %1).</source>
         <translation>Сервер зупинено (код виходу %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="849"/>
+        <location filename="../mainwindow.cpp" line="862"/>
         <source>Server stopped unexpectedly (exit code %1).</source>
         <translation>Сервер несподівано зупинився (код виходу %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="852"/>
+        <location filename="../mainwindow.cpp" line="865"/>
         <source>Llama server stopped</source>
         <translation>Сервер зупинився</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="885"/>
+        <location filename="../mainwindow.cpp" line="898"/>
         <source>Select llama-server</source>
         <translation>Виберіть llama-server</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="938"/>
+        <location filename="../mainwindow.cpp" line="951"/>
         <source>Checking %1...</source>
         <translation>Перевірка %1...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="945"/>
+        <location filename="../mainwindow.cpp" line="958"/>
         <source>%1 &amp;mdash; version %2</source>
         <translation>%1 &amp;mdash; версія %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="949"/>
+        <location filename="../mainwindow.cpp" line="962"/>
         <source>Cannot run %1</source>
         <translation>Не вдається запустити %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="962"/>
+        <location filename="../mainwindow.cpp" line="975"/>
         <source>All GPUs (auto)</source>
         <translation>Усі GPU (авто)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="978"/>
+        <location filename="../mainwindow.cpp" line="991"/>
         <source>CPU only</source>
         <translation>Лише CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="992"/>
+        <location filename="../mainwindow.cpp" line="1005"/>
         <source>%1 (not detected)</source>
         <translation>%1 (не знайдено)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1007"/>
+        <location filename="../mainwindow.cpp" line="1020"/>
         <source>Select Model</source>
         <translation>Виберіть модель</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1008"/>
+        <location filename="../mainwindow.cpp" line="1021"/>
         <source>GGUF Models (*.gguf);;All Files (*)</source>
         <translation>Моделі GGUF (*.gguf);;Усі файли (*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1017"/>
+        <location filename="../mainwindow.cpp" line="1030"/>
         <source>Select Models Folder</source>
         <translation>Виберіть теку моделей</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1075"/>
+        <location filename="../mainwindow.cpp" line="1088"/>
         <source>(missing)</source>
         <translation>(відсутня)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1105"/>
+        <location filename="../mainwindow.cpp" line="1118"/>
         <source>No mmproj*.gguf file next to the model.</source>
         <translation>Поруч із моделлю немає файлу mmproj*.gguf.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1109"/>
+        <location filename="../mainwindow.cpp" line="1122"/>
         <source>No model selected.</source>
         <translation>Модель не вибрано.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1118"/>
+        <location filename="../mainwindow.cpp" line="1131"/>
         <source>Cannot read model metadata: %1</source>
         <translation>Не вдалося прочитати метадані моделі: %1</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1127"/>
+        <location filename="../mainwindow.cpp" line="1140"/>
         <source>%n parts</source>
         <translation>
             <numerusform>%n частина</numerusform>
@@ -938,7 +950,7 @@ Model: %1
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1129"/>
+        <location filename="../mainwindow.cpp" line="1142"/>
         <source>%n layers</source>
         <translation>
             <numerusform>%n шар</numerusform>
@@ -947,47 +959,47 @@ Model: %1
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1131"/>
+        <location filename="../mainwindow.cpp" line="1144"/>
         <source>native context %1</source>
         <translation>рідний контекст %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1133"/>
+        <location filename="../mainwindow.cpp" line="1146"/>
         <source>MoE: %1 experts, %2 active</source>
         <translation>MoE: %1 експертів, %2 активних</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1157"/>
+        <location filename="../mainwindow.cpp" line="1170"/>
         <source>all GPUs</source>
         <translation>усіх GPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1171"/>
+        <location filename="../mainwindow.cpp" line="1184"/>
         <source>Model (%1) fits into free VRAM on %2 (%3).</source>
         <translation>Модель (%1) вміщується у вільну відеопам’ять %2 (%3).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1175"/>
+        <location filename="../mainwindow.cpp" line="1188"/>
         <source>Model (%1) is larger than free VRAM on %2 (%3): part of it will run on the CPU, which is slower.</source>
         <translation>Модель (%1) більша за вільну відеопам’ять %2 (%3): частина виконуватиметься на CPU, а це повільніше.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1178"/>
+        <location filename="../mainwindow.cpp" line="1191"/>
         <source>For this MoE model, keeping the experts on the CPU (option below) usually gives the best speed.</source>
         <translation>Для цієї MoE-моделі найкращу швидкість зазвичай дає розміщення експертів на CPU (опція нижче).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1215"/>
+        <location filename="../mainwindow.cpp" line="1228"/>
         <source>A quantized KV cache needs Flash Attention: set it to Auto or On on the Model tab.</source>
         <translation>Квантований KV-кеш потребує Flash Attention: встановіть «Авто» або «Увімк.» на вкладці «Модель».</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1270"/>
+        <location filename="../mainwindow.cpp" line="1283"/>
         <source>Could not write %1</source>
         <translation>Не вдалося записати %1</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1479"/>
+        <location filename="../mainwindow.cpp" line="1492"/>
         <source>Moved %n option(s) from Extra Arguments to the Advanced tab</source>
         <translation>
             <numerusform>Перенесено %n опцію з додаткових аргументів на вкладку «Додатково»</numerusform>
