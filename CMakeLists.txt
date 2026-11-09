@@ -38,9 +38,8 @@ install(TARGETS Llama-launcher
 )
 
 # Desktop integration (XDG): icon + menu entry pointing at the installed binary.
-install(FILES rsc/gemini-svg.svg
+install(FILES rsc/llama-launcher.svg
     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-    RENAME llama-launcher.svg
 )
 configure_file(llama-launcher.desktop.in ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/llama-launcher.desktop
