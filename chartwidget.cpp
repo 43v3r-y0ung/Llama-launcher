@@ -12,7 +12,6 @@
 namespace {
 
 constexpr int kPad = 8;
-constexpr int kMiniSparkWidth = 48;
 constexpr double kLineWidth = 2.0;
 
 // Categorical slots 1-2 of the validated reference palette, stepped per theme.
@@ -43,14 +42,6 @@ ChartWidget::ChartWidget(QWidget *parent)
 {
     setMouseTracking(true);
     setAttribute(Qt::WA_OpaquePaintEvent, false);
-}
-
-void ChartWidget::setMode(Mode mode)
-{
-    m_mode = mode;
-    setMouseTracking(mode == Mode::Full);
-    updateGeometry();
-    update();
 }
 
 void ChartWidget::setTitle(const QString &title)
@@ -89,20 +80,6 @@ void ChartWidget::setMaximum(double max)
     update();
 }
 
-void ChartWidget::setCaption(const QString &caption)
-{
-    if (caption == m_caption)
-        return;
-    m_caption = caption;
-    update();
-}
-
-void ChartWidget::setSizingText(const QString &text)
-{
-    m_sizingText = text;
-    updateGeometry();
-}
-
 void ChartWidget::setCapacity(int samples)
 {
     m_capacity = qMax(2, samples);
@@ -121,17 +98,11 @@ void ChartWidget::setData(const QList<QList<double>> &series)
 
 QSize ChartWidget::sizeHint() const
 {
-    if (m_mode == Mode::Mini)
-        // left padding, caption, gap (1.5 pads), sparkline, right padding
-        return {fontMetrics().horizontalAdvance(m_sizingText) + kMiniSparkWidth + 4 * kPad,
-                fontMetrics().height() + kPad};
     return {240, 120};
 }
 
 QSize ChartWidget::minimumSizeHint() const
 {
-    if (m_mode == Mode::Mini)
-        return sizeHint();
     const QFontMetrics fm = fontMetrics();
     int h = 2 * kPad + fm.height() + 40;
     if (m_names.size() > 1)
@@ -168,10 +139,6 @@ QRectF ChartWidget::plotRect() const
 {
     const QFontMetrics fm = fontMetrics();
     QRectF r = QRectF(rect()).adjusted(kPad, kPad, -kPad, -kPad);
-    if (m_mode == Mode::Mini) {
-        r.setLeft(r.right() - kMiniSparkWidth);
-        return r.adjusted(0, 1, 0, -1);
-    }
     r.setTop(r.top() + fm.height() + 4);           // title row
     if (m_names.size() > 1)
         r.setTop(r.top() + fm.height());            // legend row
@@ -282,17 +249,6 @@ void ChartWidget::paintEvent(QPaintEvent *)
         return std::numeric_limits<double>::quiet_NaN();
     };
 
-    if (m_mode == Mode::Mini) {
-        const double v = m_series.isEmpty() ? std::numeric_limits<double>::quiet_NaN() : latest(m_series.first());
-        p.setPen(pal.color(QPalette::Text));
-        const QRectF textRect(kPad, 0, plot.left() - 1.5 * kPad, height());
-        p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
-                   fm.elidedText(m_caption.isEmpty() ? m_title + QLatin1Char(' ') + format(v) : m_caption,
-                                 Qt::ElideRight, int(textRect.width())));
-        paintSeries(p, plot, max, true);
-        return;
-    }
-
     // Title row: title on the left, values (current or hovered) on the right.
     QFont bold = font();
     bold.setBold(true);
@@ -388,7 +344,7 @@ void ChartWidget::paintEvent(QPaintEvent *)
 
 void ChartWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_mode != Mode::Full || m_series.isEmpty())
+    if (m_series.isEmpty())
         return;
     const QRectF plot = plotRect();
     int index = -1;

@@ -231,7 +231,6 @@ void MainWindow::hideEvent(QHideEvent *event)
 
 namespace {
 
-constexpr int kMiniChartSamples = 60;
 constexpr double kGiB = 1024.0 * 1024.0 * 1024.0;
 
 double orNan(double v)
@@ -279,32 +278,6 @@ void MainWindow::setupCharts()
     for (ChartWidget *chart : {ui->cpuChart, ui->ramChart, ui->gpuChart, ui->vramChart, ui->tpsChart})
         chart->setCapacity(Monitor::kHistorySize);
 
-    ui->cpuMini->setMode(ChartWidget::Mode::Mini);
-    ui->cpuMini->setTitle(tr("CPU"));
-    ui->gpuMini->setMode(ChartWidget::Mode::Mini);
-    ui->gpuMini->setTitle(tr("GPU"));
-    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini}) {
-        mini->setFormatter(percent);
-        mini->setMaximum(100);
-        mini->setToolTip(tr("Last minute; details on the Monitor tab"));
-    }
-    ui->tpsMini->setMode(ChartWidget::Mode::Mini);
-    ui->tpsMini->setFormatter(tps);
-    ui->tpsMini->setCaption(tr("— tok/s"));
-    ui->tpsMini->setToolTip(tr("Generation speed, last minute; the caption shows the last request when idle"));
-
-    // Same fixed width for all three, sized for the widest caption, so the Start button never resizes.
-    const QFontMetrics fm = ui->tpsMini->fontMetrics();
-    const QString gpuCaption = tr("GPU") + QLatin1Char(' ') + percent(100);
-    const QString widest = fm.horizontalAdvance(tps(99.9)) > fm.horizontalAdvance(gpuCaption) ? tps(99.9) : gpuCaption;
-    int width = 0;
-    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini, ui->tpsMini}) {
-        mini->setCapacity(kMiniChartSamples);
-        mini->setSizingText(widest);
-        width = qMax(width, mini->sizeHint().width());
-    }
-    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini, ui->tpsMini})
-        mini->setFixedWidth(width);
     ui->serverStatsLabel->setText(tr("The server is not running."));
 }
 
@@ -336,19 +309,15 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
     ui->ramChart->setData({ram, rss});
     if (s.ramTotal > 0)
         ui->ramChart->setMaximum(s.ramTotal / kGiB);
-    ui->cpuMini->setData({cpu.mid(qMax(0, cpu.size() - kMiniChartSamples))});
 
     // AMD GPU
     ui->gpuChart->setVisible(s.gpuPresent);
     ui->vramChart->setVisible(s.gpuPresent);
-    ui->gpuMini->setVisible(s.gpuPresent);
     if (s.gpuPresent) {
         const QString name = m_gpuName.isEmpty() ? m_monitor->gpuName() : m_gpuName;
         ui->gpuChart->setToolTip(name);
         ui->vramChart->setToolTip(name);
-        ui->gpuMini->setToolTip(tr("%1, last minute; details on the Monitor tab").arg(name));
         ui->gpuChart->setData({gpu});
-        ui->gpuMini->setData({gpu.mid(qMax(0, gpu.size() - kMiniChartSamples))});
         QStringList sensors;
         if (s.gpuSuspended) {
             sensors << tr("sleeping (power saving)");
@@ -378,11 +347,6 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
     if (s.lastPromptTps >= 0)
         last << tr("prompt %1 tok/s").arg(formatNumber(s.lastPromptTps, 1));
     ui->tpsChart->setSubtitle(last.isEmpty() ? QString() : tr("Last request: %1").arg(last.join(QStringLiteral(", "))));
-
-    // Bottom bar: the live speed while generating, otherwise the last request's.
-    ui->tpsMini->setData({gen.mid(qMax(0, gen.size() - kMiniChartSamples))});
-    const double shown = !running ? -1 : (s.busy && s.genTps > 0 ? s.genTps : s.lastGenTps);
-    ui->tpsMini->setCaption(shown >= 0 ? tr("%1 tok/s").arg(formatNumber(shown, 1)) : tr("— tok/s"));
 
     if (!running) {
         ui->serverStatsLabel->setText(tr("The server is not running."));

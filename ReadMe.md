@@ -11,7 +11,7 @@ Screenshots
 
 Key Features
 
-    Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with the Start/Stop button, the server status and live CPU/GPU/tok/s indicators always visible below them.
+    Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with the Start/Stop button and the server status always visible below them.
     Model Management:
         Model list: scans a models folder (recursively) for .gguf files and remembers recently used models from elsewhere. Multimodal projectors (mmproj) and the extra parts of split models are hidden.
         Model info read straight from the GGUF header: name, size, layer count, native context length and, for Mixture-of-Experts models, the number of experts.
@@ -33,7 +33,7 @@ Key Features
         Charts for the last 5 minutes: CPU and RAM (whole system and llama-server), AMD GPU load with temperature, power and clock, VRAM with the shared system memory (GTT), and generation speed. Hover a chart to read the values at that moment.
         Live status: prompt processing progress and speed, generation speed in tokens per second, context in use, RAM used by llama-server, and the final speeds of the last request.
         Generation speed and context use come from llama-server's /slots endpoint (enabled by default), prompt progress and final speeds from its log. A sleeping (runtime-suspended) GPU is reported idle and is not woken up.
-        The bottom bar shows CPU and GPU sparklines for the last minute and the current tok/s. Sampling stops while the window is in the tray and the server is not running.
+        Sampling stops while the window is in the tray and the server is not running.
     Multi-GPU & Custom Builds:
         llama-server path: use the system binary from PATH or point the launcher at your own build (e.g. a fresh llama.cpp Vulkan build). The detected version is shown under the field.
         Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
