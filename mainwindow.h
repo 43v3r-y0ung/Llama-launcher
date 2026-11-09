@@ -86,6 +86,7 @@ private:
 
     QString m_currentModelPath;  // model whose per-model settings are shown in the UI
     GgufInfo m_modelInfo;
+    QString m_mmprojPath;        // projector next to the current model, empty if none
     QString m_savedDevice;       // device id to select once the device list is loaded
     int m_probeGeneration = 0;
     bool m_loading = false;      // suppresses change handlers while settings are applied
@@ -111,6 +112,7 @@ private:
     void updateModelInfo();
     void loadModelSettings(const QString &modelPath);
     void saveModelSettings(const QString &modelPath);
+    int migrateExtraArgs();       // moves flags that have their own control out of "Extra Arguments"
 
     static QString autostartFilePath();
     static void migrateLegacySettings();

@@ -19,6 +19,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QThread>
 
 namespace {
 
@@ -29,6 +30,47 @@ constexpr int kDeviceFreeMiBRole = Qt::UserRole + 1;
 
 enum MoeMode { MoeAuto = 0, MoeAll = 1, MoeFirstN = 2 };
 enum FlashAttn { FaAuto = 0, FaOn = 1, FaOff = 2 };
+enum Reasoning { ReasoningAuto = 0, ReasoningOn = 1, ReasoningOff = 2 };
+
+// KV cache types offered in kvCacheCombo, by index; index 0 is the server default (f16).
+const QStringList kKvCacheTypes = {QStringLiteral("f16"), QStringLiteral("q8_0"), QStringLiteral("q4_0")};
+
+// Inverse of QProcess::splitCommand(): quote tokens that would otherwise be split or mangled.
+QString joinCommand(const QStringList &tokens)
+{
+    QStringList quoted;
+    for (const QString &t : tokens) {
+        if (t.isEmpty() || t.contains(QLatin1Char(' ')) || t.contains(QLatin1Char('\t')) || t.contains(QLatin1Char('"'))) {
+            QString escaped = t;
+            escaped.replace(QLatin1String("\""), QLatin1String("\"\"\"")); // splitCommand: """ is a literal quote
+            quoted << QLatin1Char('"') + escaped + QLatin1Char('"');
+        } else {
+            quoted << t;
+        }
+    }
+    return quoted.join(QLatin1Char(' '));
+}
+
+// The multimodal projector shipped next to a model (mmproj*.gguf); the one whose name
+// shares the longest prefix with the model wins when there are several.
+QString findMmproj(const QString &modelPath)
+{
+    const QFileInfo model(modelPath);
+    const QFileInfoList candidates = model.dir().entryInfoList({QStringLiteral("*mmproj*.gguf")}, QDir::Files, QDir::Name);
+    QString best;
+    int bestScore = -1;
+    for (const QFileInfo &fi : candidates) {
+        const QString a = fi.fileName().toLower(), b = model.fileName().toLower();
+        int common = 0;
+        while (common < a.size() && common < b.size() && a.at(common) == b.at(common))
+            ++common;
+        if (common > bestScore) {
+            bestScore = common;
+            best = fi.absoluteFilePath();
+        }
+    }
+    return best;
+}
 
 QString modelSettingsGroup(const QString &modelPath)
 {
@@ -77,7 +119,17 @@ MainWindow::MainWindow(QWidget *parent)
     ui->copyLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->clearLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-clear-history")));
 
-    connect(ui->gpuAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    ui->threadsSpin->setValue(qMax(1, QThread::idealThreadCount() / 2));
+    for (QCheckBox *check : {ui->gpuAutoCheck, ui->threadsAutoCheck, ui->batchAutoCheck, ui->parallelAutoCheck,
+                             ui->reasoningUnlimitedCheck, ui->mmprojCheck, ui->tempCheck, ui->topPCheck,
+                             ui->topKCheck, ui->minPCheck})
+        connect(check, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    for (QComboBox *combo : {ui->reasoningCombo, ui->kvCacheCombo, ui->flashAttnCombo})
+        connect(combo, &QComboBox::currentIndexChanged, this, &MainWindow::updateUiState);
+    // The physical batch cannot exceed the logical one.
+    connect(ui->batchSpin, &QSpinBox::valueChanged, ui->ubatchSpin, &QSpinBox::setMaximum);
+    ui->ubatchSpin->setMaximum(ui->batchSpin->value());
+    connect(ui->extraArgsEdit, &QLineEdit::editingFinished, this, [this] { migrateExtraArgs(); });
     connect(ui->contextAutoCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
     connect(ui->moeModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateUiState);
     connect(ui->moeModeCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateFitWarning);
@@ -401,6 +453,53 @@ QStringList MainWindow::buildArguments() const
 
     if (ui->ctxShiftCheck->isChecked())
         arguments << "--context-shift";
+
+    // Advanced tab
+    if (const int kv = ui->kvCacheCombo->currentIndex(); kv > 0)
+        arguments << "-ctk" << kKvCacheTypes.at(kv) << "-ctv" << kKvCacheTypes.at(kv);
+    if (ui->kvOnCpuCheck->isChecked())
+        arguments << "--no-kv-offload";
+    if (ui->mlockCheck->isChecked())
+        arguments << "--mlock";
+    if (ui->noMmapCheck->isChecked())
+        arguments << "--no-mmap";
+    if (!ui->threadsAutoCheck->isChecked())
+        arguments << "-t" << QString::number(ui->threadsSpin->value());
+    if (!ui->batchAutoCheck->isChecked())
+        arguments << "-b" << QString::number(ui->batchSpin->value())
+                  << "-ub" << QString::number(ui->ubatchSpin->value());
+    if (!ui->parallelAutoCheck->isChecked())
+        arguments << "-np" << QString::number(ui->parallelSpin->value());
+
+    switch (ui->reasoningCombo->currentIndex()) {
+    case ReasoningOn: arguments << "--reasoning" << "on"; break;
+    case ReasoningOff: arguments << "--reasoning" << "off"; break;
+    default: break;
+    }
+    if (ui->reasoningCombo->currentIndex() != ReasoningOff && !ui->reasoningUnlimitedCheck->isChecked())
+        arguments << "--reasoning-budget" << QString::number(ui->reasoningBudgetSpin->value());
+    if (!ui->jinjaCheck->isChecked())
+        arguments << "--no-jinja";
+    if (ui->mmprojCheck->isChecked() && !m_mmprojPath.isEmpty()) {
+        arguments << "--mmproj" << m_mmprojPath;
+        if (ui->mmprojCpuCheck->isChecked())
+            arguments << "--no-mmproj-offload";
+    }
+
+    // QString::number() is locale-independent, as llama-server expects.
+    if (ui->tempCheck->isChecked())
+        arguments << "--temp" << QString::number(ui->tempSpin->value());
+    if (ui->topPCheck->isChecked())
+        arguments << "--top-p" << QString::number(ui->topPSpin->value());
+    if (ui->topKCheck->isChecked())
+        arguments << "--top-k" << QString::number(ui->topKSpin->value());
+    if (ui->minPCheck->isChecked())
+        arguments << "--min-p" << QString::number(ui->minPSpin->value());
+
+    if (ui->metricsCheck->isChecked())
+        arguments << "--metrics";
+    if (ui->noWarmupCheck->isChecked())
+        arguments << "--no-warmup";
     if (ui->noUiCheck->isChecked())
         arguments << "--no-ui";
     if (ui->lanAccessCheck->isChecked())
@@ -461,7 +560,7 @@ void MainWindow::startServer()
     m_process->setProcessEnvironment(env);
 
     ui->consoleOutput->clear();
-    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, arguments.join(QLatin1Char(' '))));
+    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, joinCommand(arguments)));
     setStatus(Status::Starting);
     m_process->start(exe, arguments); // asynchronous: started() / errorOccurred() follow
 }
@@ -802,6 +901,10 @@ void MainWindow::onModelChanged(int index)
 void MainWindow::updateModelInfo()
 {
     const QString path = m_currentModelPath;
+    m_mmprojPath = path.isEmpty() ? QString() : findMmproj(path);
+    ui->mmprojFileLabel->setText(m_mmprojPath.isEmpty()
+                                     ? tr("No mmproj*.gguf file next to the model.")
+                                     : QFileInfo(m_mmprojPath).fileName());
     if (path.isEmpty()) {
         m_modelInfo = GgufInfo();
         ui->modelInfoLabel->setText(tr("No model selected."));
@@ -890,6 +993,27 @@ void MainWindow::updateUiState()
 
     ui->gpuLayersSpin->setDisabled(ui->gpuAutoCheck->isChecked());
     ui->contextSizeCombo->setDisabled(ui->contextAutoCheck->isChecked());
+
+    ui->threadsSpin->setDisabled(ui->threadsAutoCheck->isChecked());
+    ui->batchSpin->setDisabled(ui->batchAutoCheck->isChecked());
+    ui->ubatchSpin->setDisabled(ui->batchAutoCheck->isChecked());
+    ui->parallelSpin->setDisabled(ui->parallelAutoCheck->isChecked());
+    const bool thinking = ui->reasoningCombo->currentIndex() != ReasoningOff;
+    ui->labelReasoningBudget->setEnabled(thinking);
+    ui->reasoningUnlimitedCheck->setEnabled(thinking);
+    ui->reasoningBudgetSpin->setEnabled(thinking && !ui->reasoningUnlimitedCheck->isChecked());
+    ui->mmprojCheck->setEnabled(!m_mmprojPath.isEmpty());
+    ui->mmprojCpuCheck->setEnabled(!m_mmprojPath.isEmpty() && ui->mmprojCheck->isChecked());
+    ui->tempSpin->setEnabled(ui->tempCheck->isChecked());
+    ui->topPSpin->setEnabled(ui->topPCheck->isChecked());
+    ui->topKSpin->setEnabled(ui->topKCheck->isChecked());
+    ui->minPSpin->setEnabled(ui->minPCheck->isChecked());
+
+    const bool kvNeedsFa = ui->kvCacheCombo->currentIndex() > 0 && ui->flashAttnCombo->currentIndex() == FaOff;
+    ui->kvWarningLabel->setVisible(kvNeedsFa);
+    if (kvNeedsFa)
+        ui->kvWarningLabel->setText(QStringLiteral("<span style='color:#d35400'>&#9888; %1</span>")
+                                        .arg(tr("A quantized KV cache needs Flash Attention: set it to Auto or On on the Model tab.").toHtmlEscaped()));
 
     // MoE options only make sense for MoE models; keep them enabled if metadata is unknown.
     const bool moeApplicable = !m_modelInfo.valid || m_modelInfo.isMoe();
@@ -980,6 +1104,33 @@ void MainWindow::saveModelSettings(const QString &modelPath)
     settings.setValue("flashAttn", ui->flashAttnCombo->currentIndex());
     settings.setValue("contextShift", ui->ctxShiftCheck->isChecked());
     settings.setValue("extraArgs", ui->extraArgsEdit->text());
+    settings.setValue("kvCache", kKvCacheTypes.at(qMax(0, ui->kvCacheCombo->currentIndex())));
+    settings.setValue("kvOnCpu", ui->kvOnCpuCheck->isChecked());
+    settings.setValue("mlock", ui->mlockCheck->isChecked());
+    settings.setValue("noMmap", ui->noMmapCheck->isChecked());
+    settings.setValue("threads", ui->threadsSpin->value());
+    settings.setValue("threadsAuto", ui->threadsAutoCheck->isChecked());
+    settings.setValue("batch", ui->batchSpin->value());
+    settings.setValue("ubatch", ui->ubatchSpin->value());
+    settings.setValue("batchAuto", ui->batchAutoCheck->isChecked());
+    settings.setValue("parallel", ui->parallelSpin->value());
+    settings.setValue("parallelAuto", ui->parallelAutoCheck->isChecked());
+    settings.setValue("reasoning", ui->reasoningCombo->currentIndex());
+    settings.setValue("reasoningBudget", ui->reasoningBudgetSpin->value());
+    settings.setValue("reasoningUnlimited", ui->reasoningUnlimitedCheck->isChecked());
+    settings.setValue("jinja", ui->jinjaCheck->isChecked());
+    settings.setValue("mmproj", ui->mmprojCheck->isChecked());
+    settings.setValue("mmprojCpu", ui->mmprojCpuCheck->isChecked());
+    settings.setValue("temp", ui->tempCheck->isChecked());
+    settings.setValue("tempValue", ui->tempSpin->value());
+    settings.setValue("topP", ui->topPCheck->isChecked());
+    settings.setValue("topPValue", ui->topPSpin->value());
+    settings.setValue("topK", ui->topKCheck->isChecked());
+    settings.setValue("topKValue", ui->topKSpin->value());
+    settings.setValue("minP", ui->minPCheck->isChecked());
+    settings.setValue("minPValue", ui->minPSpin->value());
+    settings.setValue("metrics", ui->metricsCheck->isChecked());
+    settings.setValue("noWarmup", ui->noWarmupCheck->isChecked());
     settings.endGroup();
 }
 
@@ -988,7 +1139,8 @@ void MainWindow::loadModelSettings(const QString &modelPath)
     QSettings settings;
     const QString group = modelSettingsGroup(modelPath);
     if (!settings.contains(group + QStringLiteral("/path"))) {
-        return; // first time with this model: keep the current values as its starting point
+        migrateExtraArgs(); // first time with this model: keep the current values as its starting point
+        return;
     }
     settings.beginGroup(group);
     const QString contextSize = settings.value("contextSize").toString();
@@ -1003,7 +1155,131 @@ void MainWindow::loadModelSettings(const QString &modelPath)
     ui->flashAttnCombo->setCurrentIndex(qBound(0, settings.value("flashAttn", 0).toInt(), 2));
     ui->ctxShiftCheck->setChecked(settings.value("contextShift", false).toBool());
     ui->extraArgsEdit->setText(settings.value("extraArgs").toString());
+
+    // Settings saved before these options existed lack the keys; fall back to the defaults.
+    ui->kvCacheCombo->setCurrentIndex(qMax(0, kKvCacheTypes.indexOf(settings.value("kvCache").toString())));
+    ui->kvOnCpuCheck->setChecked(settings.value("kvOnCpu", false).toBool());
+    ui->mlockCheck->setChecked(settings.value("mlock", false).toBool());
+    ui->noMmapCheck->setChecked(settings.value("noMmap", false).toBool());
+    ui->threadsSpin->setValue(settings.value("threads", qMax(1, QThread::idealThreadCount() / 2)).toInt());
+    ui->threadsAutoCheck->setChecked(settings.value("threadsAuto", true).toBool());
+    ui->batchSpin->setValue(settings.value("batch", 2048).toInt());
+    ui->ubatchSpin->setValue(settings.value("ubatch", 512).toInt());
+    ui->batchAutoCheck->setChecked(settings.value("batchAuto", true).toBool());
+    ui->parallelSpin->setValue(settings.value("parallel", 1).toInt());
+    ui->parallelAutoCheck->setChecked(settings.value("parallelAuto", true).toBool());
+    ui->reasoningCombo->setCurrentIndex(qBound(0, settings.value("reasoning", 0).toInt(), 2));
+    ui->reasoningBudgetSpin->setValue(settings.value("reasoningBudget", 2048).toInt());
+    ui->reasoningUnlimitedCheck->setChecked(settings.value("reasoningUnlimited", true).toBool());
+    ui->jinjaCheck->setChecked(settings.value("jinja", true).toBool());
+    ui->mmprojCheck->setChecked(settings.value("mmproj", false).toBool());
+    ui->mmprojCpuCheck->setChecked(settings.value("mmprojCpu", false).toBool());
+    ui->tempCheck->setChecked(settings.value("temp", false).toBool());
+    ui->tempSpin->setValue(settings.value("tempValue", 0.8).toDouble());
+    ui->topPCheck->setChecked(settings.value("topP", false).toBool());
+    ui->topPSpin->setValue(settings.value("topPValue", 0.95).toDouble());
+    ui->topKCheck->setChecked(settings.value("topK", false).toBool());
+    ui->topKSpin->setValue(settings.value("topKValue", 40).toInt());
+    ui->minPCheck->setChecked(settings.value("minP", false).toBool());
+    ui->minPSpin->setValue(settings.value("minPValue", 0.05).toDouble());
+    ui->metricsCheck->setChecked(settings.value("metrics", false).toBool());
+    ui->noWarmupCheck->setChecked(settings.value("noWarmup", false).toBool());
     settings.endGroup();
+
+    migrateExtraArgs();
+}
+
+int MainWindow::migrateExtraArgs()
+{
+    const QStringList tokens = QProcess::splitCommand(ui->extraArgsEdit->text());
+    if (tokens.isEmpty())
+        return 0;
+
+    // Accept --flag=value as well as --flag value.
+    QStringList args;
+    for (const QString &t : tokens) {
+        const int eq = t.indexOf(QLatin1Char('='));
+        if (t.startsWith(QLatin1String("--")) && eq > 2)
+            args << t.left(eq) << t.mid(eq + 1);
+        else
+            args << t;
+    }
+
+    QStringList rest, kvTokens;
+    QString kvK, kvV;
+    int batch = 0, ubatch = 0, moved = 0;
+
+    for (int i = 0; i < args.size(); ++i) {
+        const QString &a = args.at(i);
+        const QString v = i + 1 < args.size() ? args.at(i + 1) : QString();
+        bool isInt = false, isNum = false;
+        const int iv = v.toInt(&isInt);
+        const double dv = v.toDouble(&isNum);
+        auto is = [&a](std::initializer_list<const char *> names) {
+            for (const char *n : names)
+                if (a == QLatin1String(n))
+                    return true;
+            return false;
+        };
+        auto flag = [&](QCheckBox *check, bool on) { check->setChecked(on); ++moved; };
+        auto valued = [&](auto apply) { apply(); ++i; ++moved; };
+
+        if (is({"-ctk", "--cache-type-k"}) && !v.isEmpty()) { kvK = v; kvTokens << a << v; ++i; }
+        else if (is({"-ctv", "--cache-type-v"}) && !v.isEmpty()) { kvV = v; kvTokens << a << v; ++i; }
+        else if (is({"-nkvo", "--no-kv-offload"})) flag(ui->kvOnCpuCheck, true);
+        else if (is({"-kvo", "--kv-offload"})) flag(ui->kvOnCpuCheck, false);
+        else if (is({"--mlock"})) flag(ui->mlockCheck, true);
+        else if (is({"--no-mmap"})) flag(ui->noMmapCheck, true);
+        else if (is({"--mmap"})) flag(ui->noMmapCheck, false);
+        else if (is({"-t", "--threads"}) && isInt)
+            valued([&] { ui->threadsAutoCheck->setChecked(iv <= 0); if (iv > 0) ui->threadsSpin->setValue(iv); });
+        else if (is({"-b", "--batch-size"}) && isInt && iv > 0) valued([&] { batch = iv; });
+        else if (is({"-ub", "--ubatch-size"}) && isInt && iv > 0) valued([&] { ubatch = iv; });
+        else if (is({"-np", "--parallel"}) && isInt)
+            valued([&] { ui->parallelAutoCheck->setChecked(iv <= 0); if (iv > 0) ui->parallelSpin->setValue(iv); });
+        else if (is({"-rea", "--reasoning"}) && (v == QLatin1String("on") || v == QLatin1String("off") || v == QLatin1String("auto")))
+            valued([&] { ui->reasoningCombo->setCurrentIndex(v == QLatin1String("on") ? ReasoningOn
+                                                             : v == QLatin1String("off") ? ReasoningOff : ReasoningAuto); });
+        else if (is({"--reasoning-budget"}) && isInt)
+            valued([&] { ui->reasoningUnlimitedCheck->setChecked(iv < 0); if (iv >= 0) ui->reasoningBudgetSpin->setValue(iv); });
+        else if (is({"--jinja"})) flag(ui->jinjaCheck, true);
+        else if (is({"--no-jinja"})) flag(ui->jinjaCheck, false);
+        else if (is({"--temp", "--temperature"}) && isNum)
+            valued([&] { ui->tempCheck->setChecked(true); ui->tempSpin->setValue(dv); });
+        else if (is({"--top-p"}) && isNum) valued([&] { ui->topPCheck->setChecked(true); ui->topPSpin->setValue(dv); });
+        else if (is({"--top-k"}) && isInt) valued([&] { ui->topKCheck->setChecked(true); ui->topKSpin->setValue(iv); });
+        else if (is({"--min-p"}) && isNum) valued([&] { ui->minPCheck->setChecked(true); ui->minPSpin->setValue(dv); });
+        else if (is({"--metrics"})) flag(ui->metricsCheck, true);
+        else if (is({"--no-warmup"})) flag(ui->noWarmupCheck, true);
+        else if (is({"--warmup"})) flag(ui->noWarmupCheck, false);
+        else if (is({"--context-shift"})) flag(ui->ctxShiftCheck, true);
+        else if (is({"--no-context-shift"})) flag(ui->ctxShiftCheck, false);
+        else if (is({"--no-mmproj-offload"})) flag(ui->mmprojCpuCheck, true);
+        else if (is({"--mmproj-offload"})) flag(ui->mmprojCpuCheck, false);
+        else rest << a;
+    }
+
+    // One combo sets both K and V, so only an identical pair of a type it offers can move.
+    const int kv = kKvCacheTypes.indexOf(kvK);
+    if (!kvTokens.isEmpty() && kvK == kvV && kv >= 0) {
+        ui->kvCacheCombo->setCurrentIndex(kv);
+        moved += 2;
+    } else {
+        rest << kvTokens;
+    }
+    if (batch || ubatch) {
+        ui->batchAutoCheck->setChecked(false);
+        if (batch)
+            ui->batchSpin->setValue(batch); // first: it bounds the micro-batch
+        if (ubatch)
+            ui->ubatchSpin->setValue(ubatch);
+    }
+
+    if (moved > 0) {
+        ui->extraArgsEdit->setText(joinCommand(rest));
+        statusBar()->showMessage(tr("Moved %n option(s) from Extra Arguments to the Advanced tab", nullptr, moved), 5000);
+    }
+    return moved;
 }
 
 void MainWindow::saveSettings()
