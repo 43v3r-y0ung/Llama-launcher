@@ -11,6 +11,7 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QIntValidator>
+#include <QLocale>
 #include <QMessageBox>
 #include <QNetworkInterface>
 #include <QRandomGenerator>
@@ -20,6 +21,9 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QThread>
+
+#include <cmath>
+#include <limits>
 
 namespace {
 
@@ -151,7 +155,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_process, &QProcess::finished, this, &MainWindow::handleProcessFinished);
 
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
-    m_monitor->start();
+    setupCharts();
+    connect(m_monitor, &Monitor::sampled, this, &MainWindow::onMonitorSample);
     m_healthTimer->setInterval(2000);
 
     m_killTimer->setSingleShot(true);
@@ -206,6 +211,184 @@ void MainWindow::closeEvent(QCloseEvent *event)
         quitApplication();
         event->accept();
     }
+}
+
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+    updateMonitorActivity();
+}
+
+void MainWindow::hideEvent(QHideEvent *event)
+{
+    QMainWindow::hideEvent(event);
+    updateMonitorActivity();
+}
+
+// ---------------------------------------------------------------------------
+// Monitoring
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr int kMiniChartSamples = 60;
+constexpr double kGiB = 1024.0 * 1024.0 * 1024.0;
+
+double orNan(double v)
+{
+    return v < 0 ? std::numeric_limits<double>::quiet_NaN() : v;
+}
+
+double bytesToGiB(qint64 bytes)
+{
+    return bytes < 0 ? std::numeric_limits<double>::quiet_NaN() : bytes / kGiB;
+}
+
+QString formatNumber(double v, int decimals)
+{
+    return QLocale().toString(v, 'f', decimals);
+}
+
+} // namespace
+
+void MainWindow::setupCharts()
+{
+    auto percent = [](double v) { return QStringLiteral("%1 %").arg(formatNumber(v, 0)); };
+    auto gib = [](double v) { return MainWindow::tr("%1 GiB").arg(formatNumber(v, 1)); };
+    auto tps = [](double v) { return MainWindow::tr("%1 tok/s").arg(formatNumber(v, 1)); };
+
+    ui->cpuChart->setTitle(tr("CPU"));
+    ui->cpuChart->setSeriesNames({tr("System"), QStringLiteral("llama-server")});
+    ui->cpuChart->setFormatter(percent);
+    ui->cpuChart->setMaximum(100);
+
+    ui->ramChart->setTitle(tr("RAM"));
+    ui->ramChart->setSeriesNames({tr("System"), QStringLiteral("llama-server")});
+    ui->ramChart->setFormatter(gib);
+
+    ui->gpuChart->setTitle(tr("GPU load"));
+    ui->gpuChart->setFormatter(percent);
+    ui->gpuChart->setMaximum(100);
+
+    ui->vramChart->setTitle(tr("VRAM"));
+    ui->vramChart->setFormatter(gib);
+
+    ui->tpsChart->setTitle(tr("Generation speed"));
+    ui->tpsChart->setFormatter(tps);
+
+    for (ChartWidget *chart : {ui->cpuChart, ui->ramChart, ui->gpuChart, ui->vramChart, ui->tpsChart})
+        chart->setCapacity(Monitor::kHistorySize);
+
+    ui->cpuMini->setMode(ChartWidget::Mode::Mini);
+    ui->cpuMini->setTitle(tr("CPU"));
+    ui->gpuMini->setMode(ChartWidget::Mode::Mini);
+    ui->gpuMini->setTitle(tr("GPU"));
+    for (ChartWidget *mini : {ui->cpuMini, ui->gpuMini}) {
+        mini->setFormatter(percent);
+        mini->setMaximum(100);
+        mini->setCapacity(kMiniChartSamples);
+        mini->setToolTip(tr("Last minute; details on the Monitor tab"));
+    }
+    ui->tpsMiniLabel->setVisible(false);
+    ui->serverStatsLabel->setText(tr("The server is not running."));
+}
+
+void MainWindow::updateMonitorActivity()
+{
+    // In the tray with the server stopped there is nothing to show or record.
+    const bool wanted = isVisible() || m_process->state() != QProcess::NotRunning;
+    if (wanted && !m_monitor->isActive())
+        m_monitor->start();
+    else if (!wanted && m_monitor->isActive())
+        m_monitor->stop();
+}
+
+void MainWindow::onMonitorSample(const MonitorSample &s)
+{
+    const QList<MonitorSample> &history = m_monitor->history();
+    QList<double> cpu, procCpu, ram, rss, gpu, vram, gen;
+    for (const MonitorSample &h : history) {
+        cpu << orNan(h.cpuPercent);
+        procCpu << orNan(h.procCpuPercent);
+        ram << bytesToGiB(h.ramUsed);
+        rss << bytesToGiB(h.procRss);
+        gpu << orNan(h.gpuBusy);
+        vram << bytesToGiB(h.vramUsed);
+        gen << orNan(h.genTps);
+    }
+
+    ui->cpuChart->setData({cpu, procCpu});
+    ui->ramChart->setData({ram, rss});
+    if (s.ramTotal > 0)
+        ui->ramChart->setMaximum(s.ramTotal / kGiB);
+    ui->cpuMini->setData({cpu.mid(qMax(0, cpu.size() - kMiniChartSamples))});
+
+    // AMD GPU
+    ui->gpuChart->setVisible(s.gpuPresent);
+    ui->vramChart->setVisible(s.gpuPresent);
+    ui->gpuMini->setVisible(s.gpuPresent);
+    if (s.gpuPresent) {
+        const QString name = m_gpuName.isEmpty() ? m_monitor->gpuName() : m_gpuName;
+        ui->gpuChart->setToolTip(name);
+        ui->vramChart->setToolTip(name);
+        ui->gpuMini->setToolTip(tr("%1, last minute; details on the Monitor tab").arg(name));
+        ui->gpuChart->setData({gpu});
+        ui->gpuMini->setData({gpu.mid(qMax(0, gpu.size() - kMiniChartSamples))});
+        QStringList sensors;
+        if (s.gpuSuspended) {
+            sensors << tr("sleeping (power saving)");
+        } else {
+            if (s.gpuTempC >= 0)
+                sensors << QStringLiteral("%1 °C").arg(formatNumber(s.gpuTempC, 0));
+            if (s.gpuPowerW >= 0)
+                sensors << tr("%1 W").arg(formatNumber(s.gpuPowerW, 0));
+            if (s.gpuClockMHz >= 0)
+                sensors << tr("%1 MHz").arg(s.gpuClockMHz);
+        }
+        ui->gpuChart->setSubtitle(sensors.join(QStringLiteral(" · ")));
+        ui->vramChart->setData({vram});
+        if (s.vramTotal > 0)
+            ui->vramChart->setMaximum(s.vramTotal / kGiB);
+        ui->vramChart->setSubtitle(s.gttUsed >= 0
+            ? tr("Shared system memory (GTT): %1 GiB").arg(formatNumber(s.gttUsed / kGiB, 2))
+            : QString());
+    }
+
+    // llama-server
+    const bool running = m_process->state() != QProcess::NotRunning;
+    ui->tpsChart->setData({gen});
+    QStringList last;
+    if (s.lastGenTps >= 0)
+        last << tr("generation %1 tok/s").arg(formatNumber(s.lastGenTps, 2));
+    if (s.lastPromptTps >= 0)
+        last << tr("prompt %1 tok/s").arg(formatNumber(s.lastPromptTps, 1));
+    ui->tpsChart->setSubtitle(last.isEmpty() ? QString() : tr("Last request: %1").arg(last.join(QStringLiteral(", "))));
+
+    if (!running) {
+        ui->serverStatsLabel->setText(tr("The server is not running."));
+        ui->tpsMiniLabel->setVisible(false);
+        return;
+    }
+    QStringList parts;
+    if (s.promptProgress >= 0)
+        parts << tr("Reading prompt: <b>%1 %</b> at %2 tok/s")
+                     .arg(formatNumber(s.promptProgress * 100, 0), formatNumber(s.promptTps, 1));
+    else if (s.busy)
+        parts << tr("Generating: <b>%1 tok/s</b>").arg(formatNumber(qMax(0.0, s.genTps), 1));
+    else
+        parts << (m_status == Status::Running ? tr("Idle") : tr("Loading model"));
+    if (s.ctxSize > 0 && s.ctxUsed >= 0)
+        parts << tr("Context: %1 / %2 (%3 %)")
+                     .arg(s.ctxUsed).arg(s.ctxSize).arg(formatNumber(100.0 * s.ctxUsed / s.ctxSize, 0));
+    if (s.procRss >= 0)
+        parts << tr("llama-server uses %1 GiB RAM").arg(formatNumber(s.procRss / kGiB, 1));
+    ui->serverStatsLabel->setText(parts.join(QStringLiteral(" &middot; ")));
+
+    // Bottom bar: the live speed while generating, otherwise the last request's.
+    const double shown = s.busy && s.genTps > 0 ? s.genTps : s.lastGenTps;
+    ui->tpsMiniLabel->setVisible(shown >= 0);
+    if (shown >= 0)
+        ui->tpsMiniLabel->setText(tr("%1 tok/s").arg(formatNumber(shown, 1)));
 }
 
 void MainWindow::setupSystemTray()
@@ -326,11 +509,13 @@ void MainWindow::setStatus(Status status)
     QString html = QStringLiteral("<span style='color:%1'>&#9679;</span> <b>%2</b>").arg(color, text);
     if (status != Status::Stopped) {
         const QString url = serverUrl().toString();
-        html += QStringLiteral(" &mdash; %1 &mdash; <a href='%2'>%2</a>")
+        // Links must not wrap in the middle when the status line wraps.
+        html += QStringLiteral(" &mdash; %1 &mdash; <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
                     .arg(m_runningModelName.toHtmlEscaped(), url.toHtmlEscaped());
         const QString lan = lanUrl().toString();
         if (!lan.isEmpty())
-            html += QStringLiteral(" &middot; %1 <a href='%2'>%2</a>").arg(tr("network:"), lan.toHtmlEscaped());
+            html += QStringLiteral(" &middot; %1 <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
+                        .arg(tr("network:"), lan.toHtmlEscaped());
     }
     ui->statusLabel->setText(html);
     ui->statusLabel->setOpenExternalLinks(true);
@@ -342,6 +527,7 @@ void MainWindow::setStatus(Status status)
         m_monitor->setServer(QUrl(), QString());
         m_monitor->setProcessId(0);
     }
+    updateMonitorActivity();
     ui->openBrowserButton->setEnabled(ready && m_runningWebUi);
     ui->copyUrlButton->setEnabled(status != Status::Stopped);
     ui->startButton->setText(running ? tr("Stop Llama Server") : tr("Start Llama Server"));
@@ -782,6 +968,8 @@ void MainWindow::populateDevices(const QString &listOutput)
     while (it.hasNext()) {
         const auto m = it.next();
         const QString desc = m.captured(2).trimmed();
+        if (m_gpuName.isEmpty() && desc.contains(QLatin1String("AMD")))
+            m_gpuName = desc.section(QStringLiteral(" ("), 0, 0); // "AMD Radeon Pro WX Series"
         ui->deviceCombo->addItem(QStringLiteral("%1: %2").arg(m.captured(1), desc), m.captured(1));
         const auto fm = freeRe.match(desc);
         if (fm.hasMatch())

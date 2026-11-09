@@ -61,6 +61,8 @@ private slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     enum class Status { Stopped, Starting, Loading, Running };
@@ -90,10 +92,14 @@ private:
     GgufInfo m_modelInfo;
     QString m_mmprojPath;        // projector next to the current model, empty if none
     QString m_savedDevice;       // device id to select once the device list is loaded
+    QString m_gpuName;           // AMD GPU name as llama-server reports it, for the monitor
     int m_probeGeneration = 0;
     bool m_loading = false;      // suppresses change handlers while settings are applied
 
     void setupSystemTray();
+    void setupCharts();
+    void onMonitorSample(const MonitorSample &sample);
+    void updateMonitorActivity(); // sample only while someone can see it or the server runs
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
     void notify(const QString &title, const QString &message,

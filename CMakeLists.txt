@@ -14,6 +14,8 @@ qt_add_executable(Llama-launcher
     mainwindow.ui
     gguf.cpp
     gguf.h
+    chartwidget.cpp
+    chartwidget.h
     monitor.cpp
     monitor.h
     resources.qrc
@@ -25,6 +27,9 @@ qt_add_translations(Llama-launcher
     RESOURCE_PREFIX /i18n
     LUPDATE_OPTIONS -no-obsolete
 )
+
+# The generated ui_mainwindow.h includes chartwidget.h (promoted widget).
+target_include_directories(Llama-launcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(Llama-launcher
     PRIVATE
