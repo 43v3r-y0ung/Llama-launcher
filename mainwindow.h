@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "gguf.h"
+#include "monitor.h"
 
 #include <QMainWindow>
 #include <QProcess>
@@ -74,6 +75,7 @@ private:
     QNetworkAccessManager *m_networkManager;
     QTimer *m_healthTimer;
     QTimer *m_killTimer;         // force-kills the server if it ignores SIGTERM
+    Monitor *m_monitor;          // CPU/RAM/GPU and llama-server statistics
 
     Status m_status = Status::Stopped;
     QString m_runningModelName;

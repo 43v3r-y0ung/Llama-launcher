@@ -106,6 +106,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_healthTimer(new QTimer(this))
     , m_killTimer(new QTimer(this))
+    , m_monitor(new Monitor(this))
 {
     ui->setupUi(this);
 
@@ -150,6 +151,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_process, &QProcess::finished, this, &MainWindow::handleProcessFinished);
 
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
+    m_monitor->start();
     m_healthTimer->setInterval(2000);
 
     m_killTimer->setSingleShot(true);
@@ -334,6 +336,12 @@ void MainWindow::setStatus(Status status)
     ui->statusLabel->setOpenExternalLinks(true);
 
     const bool ready = status == Status::Running;
+    if (ready && previous != Status::Running)
+        m_monitor->setServer(serverUrl(), ui->apiKeyEdit->text().trimmed());
+    else if (status == Status::Stopped) {
+        m_monitor->setServer(QUrl(), QString());
+        m_monitor->setProcessId(0);
+    }
     ui->openBrowserButton->setEnabled(ready && m_runningWebUi);
     ui->copyUrlButton->setEnabled(status != Status::Stopped);
     ui->startButton->setText(running ? tr("Stop Llama Server") : tr("Start Llama Server"));
@@ -567,6 +575,8 @@ void MainWindow::startServer()
 
 void MainWindow::handleProcessStarted()
 {
+    m_monitor->resetServerStats();
+    m_monitor->setProcessId(m_process->processId());
     setStatus(Status::Loading);
     m_healthTimer->start();
 }
@@ -599,6 +609,7 @@ void MainWindow::readProcessOutput()
             continue;
         ui->consoleOutput->appendPlainText(trimmed);
         m_lastOutputLine = trimmed;
+        m_monitor->feedLogLine(trimmed);
     }
 }
 

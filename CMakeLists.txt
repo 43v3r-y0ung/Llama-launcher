@@ -14,6 +14,8 @@ qt_add_executable(Llama-launcher
     mainwindow.ui
     gguf.cpp
     gguf.h
+    monitor.cpp
+    monitor.h
     resources.qrc
 )
 
