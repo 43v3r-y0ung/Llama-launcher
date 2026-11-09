@@ -1,5 +1,14 @@
 Llama Launcher
 Llama Launcher is a lightweight and intuitive C++/Qt GUI wrapper for the llama-server. Specifically designed for Linux users (optimized for openSUSE Tumbleweed and KDE Plasma), it provides a seamless way to manage and run local Large Language Models (LLMs) in GGUF format without the need for complex command-line arguments.
+
+Screenshots
+
+![Monitor tab: CPU, RAM, GPU, VRAM and generation speed while a model runs](docs/screenshots/monitor.png)
+
+| Model | Advanced | Server |
+|---|---|---|
+| ![Model tab](docs/screenshots/model.png) | ![Advanced tab](docs/screenshots/advanced.png) | ![Server tab](docs/screenshots/server.png) |
+
 Key Features
 
     Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with the Start/Stop button, the server status and live CPU/GPU/tok/s indicators always visible below them.
