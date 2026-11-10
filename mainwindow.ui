@@ -392,7 +392,7 @@
                               <string>Allow access from local network</string>
                             </property>
                             <property name="toolTip">
-                              <string>Listen on all network interfaces (--host 0.0.0.0) so other computers on your network can use the server.</string>
+                              <string>Listen on all network interfaces, IPv4 and IPv6 (--host ::), so other computers on your network can use the server.</string>
                             </property>
                           </widget>
                         </item>

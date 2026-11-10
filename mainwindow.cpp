@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QIntValidator>
@@ -823,7 +824,9 @@ QStringList MainWindow::buildArguments() const
     if (ui->noUiCheck->isChecked())
         arguments << "--no-ui";
     if (ui->lanAccessCheck->isChecked())
-        arguments << "--host" << "0.0.0.0";
+        // "::" accepts IPv6 and, on Linux's default dual-stack sockets, IPv4 too, so names such as
+        // host.local that resolve to an IPv6 address work. Without IPv6 in the kernel, bind IPv4 only.
+        arguments << "--host" << (QFile::exists(QStringLiteral("/proc/net/if_inet6")) ? "::" : "0.0.0.0");
     if (httpsEnabled())
         arguments << "--ssl-cert-file" << tlsCertFile() << "--ssl-key-file" << tlsKeyFile();
     // The API key is passed via LLAMA_API_KEY (see startServer) so it does not show up in `ps` or the log.
