@@ -152,6 +152,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->portSpin, &QSpinBox::valueChanged, this, &MainWindow::updateNetworkHint);
     connect(ui->httpsCheck, &QCheckBox::toggled, this, &MainWindow::updateNetworkHint);
     connect(ui->httpsCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    // Traffic that leaves this computer is always encrypted.
+    connect(ui->lanAccessCheck, &QCheckBox::toggled, this, [this](bool on) {
+        if (on)
+            ui->httpsCheck->setChecked(true);
+        updateUiState();
+    });
     for (QLineEdit *edit : {ui->certFileEdit, ui->keyFileEdit}) {
         connect(edit, &QLineEdit::textChanged, this, &MainWindow::updateNetworkHint);
         connect(edit, &QLineEdit::textChanged, this, &MainWindow::updateUiState);
@@ -578,7 +584,7 @@ void MainWindow::updateNetworkHint()
 {
     const bool lan = ui->lanAccessCheck->isChecked();
     const bool hasKey = !ui->apiKeyEdit->text().trimmed().isEmpty();
-    const bool https = ui->httpsCheck->isChecked();
+    const bool https = httpsEnabled();
     const auto warning = [](const QString &text) {
         return QStringLiteral("<br><span style='color:#d35400'>&#9888; %1</span>").arg(text.toHtmlEscaped());
     };
@@ -590,8 +596,6 @@ void MainWindow::updateNetworkHint()
         html = tr("Other computers can connect at %1").arg(QStringLiteral("<b>%1</b>").arg(addr.toHtmlEscaped()));
         if (!hasKey)
             html += warning(tr("No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi."));
-        if (!https)
-            html += warning(tr("Without HTTPS, prompts, answers and the API key travel over the network unencrypted."));
     }
     if (https) {
         if (!html.isEmpty())
@@ -624,6 +628,11 @@ void MainWindow::updateNetworkHint()
 // ---------------------------------------------------------------------------
 // HTTPS
 // ---------------------------------------------------------------------------
+
+bool MainWindow::httpsEnabled() const
+{
+    return ui->httpsCheck->isChecked() || ui->lanAccessCheck->isChecked();
+}
 
 bool MainWindow::usesManagedCert() const
 {
@@ -815,7 +824,7 @@ QStringList MainWindow::buildArguments() const
         arguments << "--no-ui";
     if (ui->lanAccessCheck->isChecked())
         arguments << "--host" << "0.0.0.0";
-    if (ui->httpsCheck->isChecked())
+    if (httpsEnabled())
         arguments << "--ssl-cert-file" << tlsCertFile() << "--ssl-key-file" << tlsKeyFile();
     // The API key is passed via LLAMA_API_KEY (see startServer) so it does not show up in `ps` or the log.
 
@@ -852,7 +861,7 @@ void MainWindow::startServer()
     }
 
     QString tlsNote;
-    if (ui->httpsCheck->isChecked()) {
+    if (httpsEnabled()) {
         QString error;
         if (!prepareTls(&tlsNote, &error)) {
             const QString msg = tr("HTTPS: %1").arg(error);
@@ -877,7 +886,7 @@ void MainWindow::startServer()
     m_runningPort = ui->portSpin->value();
     m_runningWebUi = !ui->noUiCheck->isChecked();
     m_runningLan = ui->lanAccessCheck->isChecked();
-    m_runningHttps = ui->httpsCheck->isChecked();
+    m_runningHttps = httpsEnabled();
     m_runningCert = m_runningHttps ? TlsCert::firstCertificate(tlsCertFile()) : QSslCertificate();
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
@@ -1370,8 +1379,13 @@ void MainWindow::updateUiState()
     ui->lanAccessCheck->setEnabled(!running);
     ui->apiKeyEdit->setEnabled(!running);
     ui->generateKeyButton->setEnabled(!running);
-    ui->httpsCheck->setEnabled(!running);
-    const bool tlsEditable = !running && ui->httpsCheck->isChecked();
+    const bool lan = ui->lanAccessCheck->isChecked();
+    ui->httpsCheck->setEnabled(!running && !lan);
+    ui->httpsCheck->setToolTip(lan ? tr("Always on while access from the local network is allowed: "
+                                        "nothing leaves this computer unencrypted.")
+                                   : tr("Serve over HTTPS so prompts, answers and the API key cannot be read "
+                                        "on the network (--ssl-cert-file / --ssl-key-file)."));
+    const bool tlsEditable = !running && httpsEnabled();
     for (QWidget *w : {static_cast<QWidget *>(ui->certFileEdit), static_cast<QWidget *>(ui->keyFileEdit),
                        static_cast<QWidget *>(ui->certBrowseButton), static_cast<QWidget *>(ui->keyBrowseButton)})
         w->setEnabled(tlsEditable);
@@ -1660,7 +1674,7 @@ void MainWindow::loadSettings()
     ui->noUiCheck->setChecked(settings.value("noUi", false).toBool());
     ui->lanAccessCheck->setChecked(settings.value("lanAccess", false).toBool());
     ui->apiKeyEdit->setText(settings.value("apiKey").toString());
-    ui->httpsCheck->setChecked(settings.value("https", false).toBool());
+    ui->httpsCheck->setChecked(settings.value("https", false).toBool() || ui->lanAccessCheck->isChecked());
     ui->certFileEdit->setText(settings.value("tlsCertFile").toString());
     ui->keyFileEdit->setText(settings.value("tlsKeyFile").toString());
     updateNetworkHint();

@@ -114,6 +114,7 @@ private:
     QUrl lanUrl() const;          // first LAN address, or empty if not listening on the network
     static QString lanAddress();
     static QStringList lanAddresses();
+    bool httpsEnabled() const;     // checked, or forced on by network access
     bool usesManagedCert() const;  // no certificate of the user's own: the launcher creates one
     QString tlsCertFile() const;
     QString tlsKeyFile() const;
