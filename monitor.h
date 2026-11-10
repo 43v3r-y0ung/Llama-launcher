@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QList>
 #include <QObject>
+#include <QSslCertificate>
 #include <QString>
 #include <QUrl>
 
@@ -63,7 +64,8 @@ public:
     // llama-server process to account CPU/RAM for (0 = none).
     void setProcessId(qint64 pid);
     // Server to poll for slot statistics once it answers /health; empty URL stops polling.
-    void setServer(const QUrl &baseUrl, const QString &apiKey);
+    // pinnedCert: for an HTTPS server, the exact certificate it presents (self-signed or local CA).
+    void setServer(const QUrl &baseUrl, const QString &apiKey, const QSslCertificate &pinnedCert = QSslCertificate());
     // Server output, one line at a time; picks up throughput reports.
     void feedLogLine(const QString &line);
     // Forget the inference figures (new server run).
@@ -110,6 +112,7 @@ private:
     // Server polling
     QUrl m_serverUrl;
     QString m_apiKey;
+    QSslCertificate m_pinnedCert;
     QNetworkReply *m_slotsReply = nullptr;
     qint64 m_prevDecoded = -1;      // sum of n_decoded over slots at the previous poll
     qint64 m_prevDecodedMs = 0;

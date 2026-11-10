@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "tlscert.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -18,6 +19,9 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSettings>
+#include <QSslConfiguration>
+#include <QSslError>
+#include <QSslSocket>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QThread>
@@ -146,6 +150,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->lanAccessCheck, &QCheckBox::toggled, this, &MainWindow::updateNetworkHint);
     connect(ui->apiKeyEdit, &QLineEdit::textChanged, this, &MainWindow::updateNetworkHint);
     connect(ui->portSpin, &QSpinBox::valueChanged, this, &MainWindow::updateNetworkHint);
+    connect(ui->httpsCheck, &QCheckBox::toggled, this, &MainWindow::updateNetworkHint);
+    connect(ui->httpsCheck, &QCheckBox::toggled, this, &MainWindow::updateUiState);
+    for (QLineEdit *edit : {ui->certFileEdit, ui->keyFileEdit}) {
+        connect(edit, &QLineEdit::textChanged, this, &MainWindow::updateNetworkHint);
+        connect(edit, &QLineEdit::textChanged, this, &MainWindow::updateUiState);
+    }
+    ui->networkHintLabel->setOpenExternalLinks(true);
 
     // Server output: stdout and stderr interleaved in the order they were written.
     m_process->setProcessChannelMode(QProcess::MergedChannels);
@@ -439,13 +450,19 @@ void MainWindow::notify(const QString &title, const QString &message, QSystemTra
 
 QUrl MainWindow::serverUrl() const
 {
-    return QUrl(QStringLiteral("http://127.0.0.1:%1/").arg(m_runningPort));
+    return QUrl(QStringLiteral("%1://127.0.0.1:%2/").arg(m_runningHttps ? "https" : "http").arg(m_runningPort));
 }
 
 QString MainWindow::lanAddress()
 {
-    // Pick the IPv4 address of a real network card; skip loopback and virtual bridges
+    return lanAddresses().value(0);
+}
+
+QStringList MainWindow::lanAddresses()
+{
+    // IPv4 addresses of real network cards; skip loopback and virtual bridges
     // (Docker, libvirt, VPN tunnels...) whose addresses are useless to other machines.
+    QStringList result;
     static const QRegularExpression virtualIf(QStringLiteral("^(docker|br-|veth|virbr|vmnet|vboxnet|tun|tap|wg|lxc|lxd|podman|cni|flannel|zt)"));
     const auto interfaces = QNetworkInterface::allInterfaces();
     for (const QNetworkInterface &iface : interfaces) {
@@ -456,17 +473,19 @@ QString MainWindow::lanAddress()
         const auto entries = iface.addressEntries();
         for (const QNetworkAddressEntry &entry : entries) {
             const QHostAddress ip = entry.ip();
-            if (ip.protocol() == QAbstractSocket::IPv4Protocol && !ip.isLoopback() && !ip.isLinkLocal())
-                return ip.toString();
+            if (ip.protocol() == QAbstractSocket::IPv4Protocol && !ip.isLoopback() && !ip.isLinkLocal()
+                && !result.contains(ip.toString()))
+                result << ip.toString();
         }
     }
-    return {};
+    return result;
 }
 
 QUrl MainWindow::lanUrl() const
 {
     const QString ip = m_runningLan ? lanAddress() : QString();
-    return ip.isEmpty() ? QUrl() : QUrl(QStringLiteral("http://%1:%2/").arg(ip).arg(m_runningPort));
+    return ip.isEmpty() ? QUrl()
+                        : QUrl(QStringLiteral("%1://%2:%3/").arg(m_runningHttps ? "https" : "http", ip).arg(m_runningPort));
 }
 
 void MainWindow::setStatus(Status status)
@@ -499,7 +518,7 @@ void MainWindow::setStatus(Status status)
 
     const bool ready = status == Status::Running;
     if (ready && previous != Status::Running)
-        m_monitor->setServer(serverUrl(), ui->apiKeyEdit->text().trimmed());
+        m_monitor->setServer(serverUrl(), ui->apiKeyEdit->text().trimmed(), m_runningHttps ? m_runningCert : QSslCertificate());
     else if (status == Status::Stopped) {
         m_monitor->setServer(QUrl(), QString());
         m_monitor->setProcessId(0);
@@ -559,18 +578,139 @@ void MainWindow::updateNetworkHint()
 {
     const bool lan = ui->lanAccessCheck->isChecked();
     const bool hasKey = !ui->apiKeyEdit->text().trimmed().isEmpty();
+    const bool https = ui->httpsCheck->isChecked();
+    const auto warning = [](const QString &text) {
+        return QStringLiteral("<br><span style='color:#d35400'>&#9888; %1</span>").arg(text.toHtmlEscaped());
+    };
     QString html;
     if (lan) {
         const QString ip = lanAddress();
         const QString addr = ip.isEmpty() ? tr("no network connection found")
-                                          : QStringLiteral("http://%1:%2/").arg(ip).arg(ui->portSpin->value());
+                                          : QStringLiteral("%1://%2:%3/").arg(https ? "https" : "http", ip).arg(ui->portSpin->value());
         html = tr("Other computers can connect at %1").arg(QStringLiteral("<b>%1</b>").arg(addr.toHtmlEscaped()));
         if (!hasKey)
-            html += QStringLiteral("<br><span style='color:#d35400'>&#9888; %1</span>")
-                        .arg(tr("No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi.").toHtmlEscaped());
+            html += warning(tr("No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi."));
+        if (!https)
+            html += warning(tr("Without HTTPS, prompts, answers and the API key travel over the network unencrypted."));
+    }
+    if (https) {
+        if (!html.isEmpty())
+            html += QStringLiteral("<br>");
+        if (usesManagedCert()) {
+            const QString fp = TlsCert::fingerprint(TlsCert::firstCertificate(TlsCert::caCertPath()));
+            if (fp.isEmpty()) {
+                html += tr("A certificate will be created when the server starts.").toHtmlEscaped();
+            } else {
+                const QString link = QStringLiteral("<a href='%1'>ca.pem</a>")
+                                         .arg(QUrl::fromLocalFile(TlsCert::directory()).toString(QUrl::FullyEncoded));
+                html += tr("To avoid browser warnings on other devices, import the CA certificate %1 there once "
+                           "and trust it for websites.").arg(link);
+                html += QStringLiteral("<br><small>SHA-256: %1</small>").arg(fp);
+                const QString reason = TlsCert::renewalReason(TlsCert::currentNames(lanAddresses()));
+                if (!reason.isEmpty())
+                    html += QStringLiteral("<br>") + tr("The server certificate will be renewed at start (%1).").arg(reason).toHtmlEscaped();
+            }
+        } else if (ui->certFileEdit->text().trimmed().isEmpty() || ui->keyFileEdit->text().trimmed().isEmpty()) {
+            html += warning(tr("Choose both the certificate and its private key, or clear both to let the launcher create them."))
+                        .mid(4); // no leading line break
+        }
+        if (!QSslSocket::supportsSsl())
+            html += warning(tr("Qt has no TLS support here, so the launcher cannot check the server's status."));
     }
     ui->networkHintLabel->setText(html);
     ui->networkHintLabel->setVisible(!html.isEmpty());
+}
+
+// ---------------------------------------------------------------------------
+// HTTPS
+// ---------------------------------------------------------------------------
+
+bool MainWindow::usesManagedCert() const
+{
+    return ui->certFileEdit->text().trimmed().isEmpty() && ui->keyFileEdit->text().trimmed().isEmpty();
+}
+
+QString MainWindow::tlsCertFile() const
+{
+    return usesManagedCert() ? TlsCert::serverCertPath() : ui->certFileEdit->text().trimmed();
+}
+
+QString MainWindow::tlsKeyFile() const
+{
+    return usesManagedCert() ? TlsCert::serverKeyPath() : ui->keyFileEdit->text().trimmed();
+}
+
+bool MainWindow::prepareTls(QString *note, QString *error)
+{
+    if (usesManagedCert()) {
+        const TlsCert::Names names = TlsCert::currentNames(lanAddresses());
+        const QString reason = TlsCert::renewalReason(names);
+        if (!reason.isEmpty()) {
+            if (!TlsCert::generate(names, error))
+                return false;
+            *note = tr("Created a new server certificate (%1) for %2 in %3")
+                        .arg(reason, (names.dns + names.ips).join(QStringLiteral(", ")), TlsCert::directory());
+        }
+        return true;
+    }
+
+    const QString cert = tlsCertFile(), key = tlsKeyFile();
+    if (cert.isEmpty() || key.isEmpty()) {
+        *error = tr("choose both the certificate and its private key, or clear both to let the launcher create them.");
+        return false;
+    }
+    if (TlsCert::firstCertificate(cert).isNull()) {
+        *error = tr("%1 is not a readable PEM certificate.").arg(cert);
+        return false;
+    }
+    if (!QFileInfo(key).isReadable()) {
+        *error = tr("cannot read the private key %1.").arg(key);
+        return false;
+    }
+    return true;
+}
+
+void MainWindow::acceptPinnedCert(QNetworkReply *reply) const
+{
+    // The launcher talks to its own server on 127.0.0.1, which a self-signed or locally
+    // issued certificate does not satisfy; trust exactly the certificate it was started with.
+    const QSslCertificate pinned = m_runningCert;
+    connect(reply, &QNetworkReply::sslErrors, reply, [reply, pinned](const QList<QSslError> &errors) {
+        if (!pinned.isNull() && reply->sslConfiguration().peerCertificate() == pinned)
+            reply->ignoreSslErrors(errors);
+    });
+}
+
+void MainWindow::on_generateCertButton_clicked()
+{
+    const TlsCert::Names names = TlsCert::currentNames(lanAddresses());
+    QString error;
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const bool ok = TlsCert::generate(names, &error);
+    QApplication::restoreOverrideCursor();
+    if (!ok) {
+        QMessageBox::warning(this, tr("Warning"), tr("Could not create the certificate: %1").arg(error));
+        return;
+    }
+    statusBar()->showMessage(tr("Created a certificate for %1").arg((names.dns + names.ips).join(QStringLiteral(", "))), 8000);
+    updateNetworkHint();
+}
+
+void MainWindow::on_certBrowseButton_clicked()
+{
+    const QString fileName = QFileDialog::getOpenFileName(this, tr("Select certificate"), QString(),
+                                                          tr("PEM files (*.pem *.crt *.cer);;All files (*)"));
+    if (!fileName.isEmpty())
+        ui->certFileEdit->setText(fileName);
+}
+
+void MainWindow::on_keyBrowseButton_clicked()
+{
+    const QString fileName = QFileDialog::getOpenFileName(this, tr("Select private key"),
+                                                          QFileInfo(ui->certFileEdit->text()).absolutePath(),
+                                                          tr("PEM files (*.pem *.key);;All files (*)"));
+    if (!fileName.isEmpty())
+        ui->keyFileEdit->setText(fileName);
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +815,8 @@ QStringList MainWindow::buildArguments() const
         arguments << "--no-ui";
     if (ui->lanAccessCheck->isChecked())
         arguments << "--host" << "0.0.0.0";
+    if (ui->httpsCheck->isChecked())
+        arguments << "--ssl-cert-file" << tlsCertFile() << "--ssl-key-file" << tlsKeyFile();
     // The API key is passed via LLAMA_API_KEY (see startServer) so it does not show up in `ps` or the log.
 
     arguments << "--port" << QString::number(ui->portSpin->value());
@@ -709,6 +851,19 @@ void MainWindow::startServer()
         return;
     }
 
+    QString tlsNote;
+    if (ui->httpsCheck->isChecked()) {
+        QString error;
+        if (!prepareTls(&tlsNote, &error)) {
+            const QString msg = tr("HTTPS: %1").arg(error);
+            if (isVisible())
+                QMessageBox::warning(this, tr("Warning"), msg);
+            else
+                notify(tr("Llama Launcher"), msg, QSystemTrayIcon::Warning);
+            return;
+        }
+    }
+
     saveSettings(); // persist what is about to be used, even if the session ends abruptly
     addRecentModel(modelPath);
 
@@ -722,6 +877,8 @@ void MainWindow::startServer()
     m_runningPort = ui->portSpin->value();
     m_runningWebUi = !ui->noUiCheck->isChecked();
     m_runningLan = ui->lanAccessCheck->isChecked();
+    m_runningHttps = ui->httpsCheck->isChecked();
+    m_runningCert = m_runningHttps ? TlsCert::firstCertificate(tlsCertFile()) : QSslCertificate();
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.remove(QStringLiteral("LLAMA_API_KEY"));
@@ -731,6 +888,8 @@ void MainWindow::startServer()
     m_process->setProcessEnvironment(env);
 
     ui->consoleOutput->clear();
+    if (!tlsNote.isEmpty())
+        ui->consoleOutput->appendPlainText(tlsNote);
     ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, joinCommand(arguments)));
     setStatus(Status::Starting);
     m_process->start(exe, arguments); // asynchronous: started() / errorOccurred() follow
@@ -840,6 +999,7 @@ void MainWindow::checkServerHealth()
     QNetworkRequest request(serverUrl().resolved(QUrl(QStringLiteral("health"))));
     request.setTransferTimeout(1500); // shorter than the 2 s poll interval, so replies don't pile up
     QNetworkReply *reply = m_networkManager->get(request);
+    acceptPinnedCert(reply);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
@@ -1210,6 +1370,12 @@ void MainWindow::updateUiState()
     ui->lanAccessCheck->setEnabled(!running);
     ui->apiKeyEdit->setEnabled(!running);
     ui->generateKeyButton->setEnabled(!running);
+    ui->httpsCheck->setEnabled(!running);
+    const bool tlsEditable = !running && ui->httpsCheck->isChecked();
+    for (QWidget *w : {static_cast<QWidget *>(ui->certFileEdit), static_cast<QWidget *>(ui->keyFileEdit),
+                       static_cast<QWidget *>(ui->certBrowseButton), static_cast<QWidget *>(ui->keyBrowseButton)})
+        w->setEnabled(tlsEditable);
+    ui->generateCertButton->setEnabled(tlsEditable && usesManagedCert());
     ui->serverPathEdit->setEnabled(!running);
     ui->serverBrowseButton->setEnabled(!running);
 }
@@ -1466,6 +1632,9 @@ void MainWindow::saveSettings()
     settings.setValue("noUi", ui->noUiCheck->isChecked());
     settings.setValue("lanAccess", ui->lanAccessCheck->isChecked());
     settings.setValue("apiKey", ui->apiKeyEdit->text().trimmed());
+    settings.setValue("https", ui->httpsCheck->isChecked());
+    settings.setValue("tlsCertFile", ui->certFileEdit->text().trimmed());
+    settings.setValue("tlsKeyFile", ui->keyFileEdit->text().trimmed());
     settings.setValue("modelsDir", ui->modelsDirEdit->text().trimmed());
     settings.setValue("lastModel", m_currentModelPath);
     settings.setValue("autoStartServer", ui->autoStartServerCheck->isChecked());
@@ -1491,6 +1660,9 @@ void MainWindow::loadSettings()
     ui->noUiCheck->setChecked(settings.value("noUi", false).toBool());
     ui->lanAccessCheck->setChecked(settings.value("lanAccess", false).toBool());
     ui->apiKeyEdit->setText(settings.value("apiKey").toString());
+    ui->httpsCheck->setChecked(settings.value("https", false).toBool());
+    ui->certFileEdit->setText(settings.value("tlsCertFile").toString());
+    ui->keyFileEdit->setText(settings.value("tlsKeyFile").toString());
     updateNetworkHint();
     ui->autoStartServerCheck->setChecked(settings.value("autoStartServer", false).toBool());
     ui->notificationsCheck->setChecked(settings.value("notifications", true).toBool());

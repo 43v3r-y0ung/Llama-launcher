@@ -10,6 +10,8 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QSslConfiguration>
+#include <QSslError>
 #include <QThread>
 #include <QTimer>
 
@@ -102,10 +104,11 @@ void Monitor::setProcessId(qint64 pid)
     m_prevProcMs = 0;
 }
 
-void Monitor::setServer(const QUrl &baseUrl, const QString &apiKey)
+void Monitor::setServer(const QUrl &baseUrl, const QString &apiKey, const QSslCertificate &pinnedCert)
 {
     m_serverUrl = baseUrl;
     m_apiKey = apiKey;
+    m_pinnedCert = pinnedCert;
     m_prevDecoded = -1;
     m_genTps = 0;
     m_busy = false;
@@ -323,6 +326,11 @@ void Monitor::pollSlots()
         request.setRawHeader("Authorization", "Bearer " + m_apiKey.toUtf8());
     m_slotsReply = m_network->get(request);
     QNetworkReply *reply = m_slotsReply;
+    connect(reply, &QNetworkReply::sslErrors, this, [this, reply](const QList<QSslError> &errors) {
+        // Accept exactly the certificate the launcher started the server with, nothing else.
+        if (!m_pinnedCert.isNull() && reply->sslConfiguration().peerCertificate() == m_pinnedCert)
+            reply->ignoreSslErrors(errors);
+    });
     connect(reply, &QNetworkReply::finished, this, [this, reply] { handleSlotsReply(reply); });
 }
 

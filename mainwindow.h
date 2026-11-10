@@ -6,6 +6,7 @@
 
 #include <QMainWindow>
 #include <QProcess>
+#include <QSslCertificate>
 #include <QSystemTrayIcon>
 #include <QMenu>
 #include <QCloseEvent>
@@ -42,6 +43,9 @@ private slots:
     void on_openBrowserButton_clicked();
     void on_copyUrlButton_clicked();
     void on_generateKeyButton_clicked();
+    void on_generateCertButton_clicked();
+    void on_certBrowseButton_clicked();
+    void on_keyBrowseButton_clicked();
     void on_copyLogButton_clicked();
     void on_clearLogButton_clicked();
     void updateNetworkHint();
@@ -84,6 +88,8 @@ private:
     int m_runningPort = 8080;
     bool m_runningWebUi = true;
     bool m_runningLan = false;
+    bool m_runningHttps = false;
+    QSslCertificate m_runningCert;  // what the HTTPS server presents; the launcher trusts only this
     bool m_stopRequested = false; // distinguishes a user stop from a crash
     QByteArray m_outputBuffer;    // incomplete trailing line of server output
     QString m_lastOutputLine;
@@ -107,6 +113,12 @@ private:
     QUrl serverUrl() const;
     QUrl lanUrl() const;          // first LAN address, or empty if not listening on the network
     static QString lanAddress();
+    static QStringList lanAddresses();
+    bool usesManagedCert() const;  // no certificate of the user's own: the launcher creates one
+    QString tlsCertFile() const;
+    QString tlsKeyFile() const;
+    bool prepareTls(QString *note, QString *error); // makes sure the certificate exists and fits
+    void acceptPinnedCert(QNetworkReply *reply) const;
     QStringList buildArguments() const;
 
     QString serverExecutable() const;

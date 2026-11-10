@@ -18,6 +18,8 @@ qt_add_executable(Llama-launcher
     chartwidget.h
     monitor.cpp
     monitor.h
+    tlscert.cpp
+    tlscert.h
     resources.qrc
 )
 

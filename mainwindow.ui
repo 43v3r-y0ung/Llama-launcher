@@ -425,7 +425,82 @@
                         </property>
                       </widget>
                     </item>
-                    <item row="5" column="1" colspan="2">
+                    <item row="5" column="0">
+                      <widget class="QLabel" name="labelEncryption">
+                        <property name="text">
+                          <string>Encryption:</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="5" column="1">
+                      <widget class="QCheckBox" name="httpsCheck">
+                        <property name="text">
+                          <string>Use HTTPS (encrypt traffic)</string>
+                        </property>
+                        <property name="toolTip">
+                          <string>Serve over HTTPS so prompts, answers and the API key cannot be read on the network (--ssl-cert-file / --ssl-key-file).</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="5" column="2">
+                      <widget class="QPushButton" name="generateCertButton">
+                        <property name="text">
+                          <string>New Certificate</string>
+                        </property>
+                        <property name="toolTip">
+                          <string>Issue a new server certificate for this computer's current name and addresses. The local CA is kept, so devices that already trust it keep working.</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="6" column="0">
+                      <widget class="QLabel" name="labelCertFile">
+                        <property name="text">
+                          <string>Certificate:</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="6" column="1">
+                      <widget class="QLineEdit" name="certFileEdit">
+                        <property name="placeholderText">
+                          <string>created by the launcher</string>
+                        </property>
+                        <property name="toolTip">
+                          <string>PEM certificate (chain) to use instead of the one the launcher creates. Leave empty to let the launcher manage it.</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="6" column="2">
+                      <widget class="QPushButton" name="certBrowseButton">
+                        <property name="text">
+                          <string>Browse...</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="7" column="0">
+                      <widget class="QLabel" name="labelKeyFile">
+                        <property name="text">
+                          <string>Private key:</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="7" column="1">
+                      <widget class="QLineEdit" name="keyFileEdit">
+                        <property name="placeholderText">
+                          <string>created by the launcher</string>
+                        </property>
+                        <property name="toolTip">
+                          <string>PEM private key of your own certificate.</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="7" column="2">
+                      <widget class="QPushButton" name="keyBrowseButton">
+                        <property name="text">
+                          <string>Browse...</string>
+                        </property>
+                      </widget>
+                    </item>
+                    <item row="8" column="1" colspan="2">
                       <widget class="QLabel" name="networkHintLabel">
                         <property name="text">
                           <string/>
