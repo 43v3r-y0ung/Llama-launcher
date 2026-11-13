@@ -16,6 +16,7 @@
 #include <QNetworkReply>
 #include <QTimer>
 #include <QToolButton>
+#include <QComboBox>
 #include <QUrl>
 #include <functional>
 
@@ -71,6 +72,11 @@ private slots:
     void setWhenIdle(int action); // WhenIdle; toggles the pending action
     void requestQuit();
     void setupCornerControls();
+    void setupSamplingPresets();
+    void updatePresetCombo();    // selects the preset the sampling values match, if any
+    void applySamplingPreset(int index);
+    void saveSamplingPreset();
+    void deleteSamplingPreset();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -97,6 +103,8 @@ private:
     QAction *m_restartIdleAction = nullptr;
     QToolButton *m_applyButton = nullptr;     // "Restart to Apply", shown while settings differ from the running server
     QTimer *m_pendingTimer = nullptr;
+    QComboBox *m_presetCombo = nullptr;
+    QToolButton *m_deletePresetButton = nullptr;
     QAction *m_stopIdleAction = nullptr;
     enum WhenIdle { IdleNothing, IdleRestart, IdleStop };
     WhenIdle m_whenIdle = IdleNothing; // done once no request is being processed

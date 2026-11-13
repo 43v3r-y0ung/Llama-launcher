@@ -13,6 +13,8 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHBoxLayout>
+#include <QInputDialog>
+#include <QStandardItemModel>
 #include <QIntValidator>
 #include <QLocale>
 #include <QMessageBox>
@@ -228,6 +230,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
     setupCharts();
+    setupSamplingPresets();
     connect(m_monitor, &Monitor::sampled, this, &MainWindow::onMonitorSample);
     m_healthTimer->setInterval(2000);
 
@@ -776,6 +779,189 @@ void MainWindow::updateStatusText()
             tooltip += QLatin1Char('\n') + lanUrl().toString();
         m_trayIcon->setToolTip(tooltip);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Sampling presets: named sets of the "Default sampling" values, shared by all models
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct SamplingField
+{
+    QCheckBox *check;
+    QAbstractSpinBox *spin;
+    const char *key; // settings key of the checkbox; the value is stored as <key>Value
+};
+
+double spinValue(QAbstractSpinBox *spin)
+{
+    if (auto *d = qobject_cast<QDoubleSpinBox *>(spin))
+        return d->value();
+    return qobject_cast<QSpinBox *>(spin)->value();
+}
+
+void setSpinValue(QAbstractSpinBox *spin, double v)
+{
+    if (auto *d = qobject_cast<QDoubleSpinBox *>(spin))
+        d->setValue(v);
+    else
+        qobject_cast<QSpinBox *>(spin)->setValue(qRound(v));
+}
+
+const QString kPresetGroup = QStringLiteral("samplingPresets");
+
+} // namespace
+
+static QList<SamplingField> samplingFields(Ui::MainWindow *ui)
+{
+    return {
+        {ui->tempCheck, ui->tempSpin, "temp"},
+        {ui->topPCheck, ui->topPSpin, "topP"},
+        {ui->topKCheck, ui->topKSpin, "topK"},
+        {ui->minPCheck, ui->minPSpin, "minP"},
+        {ui->presencePenaltyCheck, ui->presencePenaltySpin, "presencePenalty"},
+        {ui->frequencyPenaltyCheck, ui->frequencyPenaltySpin, "frequencyPenalty"},
+    };
+}
+
+void MainWindow::setupSamplingPresets()
+{
+    auto *row = new QHBoxLayout;
+    auto *label = new QLabel(tr("Preset:"), this);
+    m_presetCombo = new QComboBox(this);
+    m_presetCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_presetCombo->setToolTip(tr("Named sets of these values, shared by all models. "
+                                 "Shows the preset the current values match."));
+    label->setBuddy(m_presetCombo);
+    auto *save = new QToolButton(this);
+    save->setText(tr("Save As..."));
+    save->setToolTip(tr("Save the current values as a preset"));
+    m_deletePresetButton = new QToolButton(this);
+    m_deletePresetButton->setText(tr("Delete"));
+    m_deletePresetButton->setToolTip(tr("Delete the selected preset"));
+    row->addWidget(label);
+    row->addWidget(m_presetCombo, 1);
+    row->addWidget(save);
+    row->addWidget(m_deletePresetButton);
+    ui->samplingGrid->addLayout(row, ui->samplingGrid->rowCount(), 0, 1, ui->samplingGrid->columnCount());
+
+    connect(m_presetCombo, &QComboBox::activated, this, &MainWindow::applySamplingPreset);
+    connect(save, &QToolButton::clicked, this, &MainWindow::saveSamplingPreset);
+    connect(m_deletePresetButton, &QToolButton::clicked, this, &MainWindow::deleteSamplingPreset);
+    for (const SamplingField &f : samplingFields(ui)) {
+        connect(f.check, &QCheckBox::toggled, this, &MainWindow::updatePresetCombo);
+        if (auto *d = qobject_cast<QDoubleSpinBox *>(f.spin))
+            connect(d, &QDoubleSpinBox::valueChanged, this, &MainWindow::updatePresetCombo);
+        else
+            connect(qobject_cast<QSpinBox *>(f.spin), &QSpinBox::valueChanged, this, &MainWindow::updatePresetCombo);
+    }
+    updatePresetCombo();
+}
+
+void MainWindow::updatePresetCombo()
+{
+    // Item data: preset name; empty for the built-in "Server defaults"; invalid for "Custom".
+    QSettings settings;
+    settings.beginGroup(kPresetGroup);
+    QStringList names = settings.childGroups();
+    names.sort(Qt::CaseInsensitive);
+
+    const QList<SamplingField> fields = samplingFields(ui);
+    auto matches = [&](const QString &name) {
+        for (const SamplingField &f : fields) {
+            const bool on = name.isEmpty() ? false : settings.value(name + QLatin1Char('/') + QLatin1String(f.key)).toBool();
+            if (f.check->isChecked() != on)
+                return false;
+            if (on && qAbs(spinValue(f.spin) - settings.value(name + QLatin1Char('/') + QLatin1String(f.key) + QLatin1String("Value")).toDouble()) > 1e-6)
+                return false;
+        }
+        return true;
+    };
+
+    const QSignalBlocker blocker(m_presetCombo);
+    m_presetCombo->clear();
+    m_presetCombo->addItem(tr("Custom"), QVariant());
+    m_presetCombo->addItem(tr("Server defaults (nothing set)"), QString());
+    for (const QString &name : std::as_const(names))
+        m_presetCombo->addItem(name, name);
+
+    int current = 0;
+    if (matches(QString()))
+        current = 1;
+    for (int i = 0; i < names.size() && current == 0; ++i) {
+        if (matches(names.at(i)))
+            current = i + 2;
+    }
+    m_presetCombo->setCurrentIndex(current);
+    // "Custom" is only a state, not something to pick.
+    if (auto *model = qobject_cast<QStandardItemModel *>(m_presetCombo->model()))
+        model->item(0)->setEnabled(false);
+    m_deletePresetButton->setEnabled(current >= 2);
+}
+
+void MainWindow::applySamplingPreset(int index)
+{
+    const QVariant data = m_presetCombo->itemData(index);
+    if (!data.isValid())
+        return;
+    const QString name = data.toString();
+    QSettings settings;
+    settings.beginGroup(kPresetGroup);
+    for (const SamplingField &f : samplingFields(ui)) {
+        const QString key = name + QLatin1Char('/') + QLatin1String(f.key);
+        const bool on = !name.isEmpty() && settings.value(key).toBool();
+        f.check->setChecked(on);
+        if (on)
+            setSpinValue(f.spin, settings.value(key + QLatin1String("Value")).toDouble());
+    }
+    updatePresetCombo();
+    statusBar()->showMessage(tr("Applied the sampling preset \"%1\"").arg(m_presetCombo->currentText()), 3000);
+}
+
+void MainWindow::saveSamplingPreset()
+{
+    const QVariant current = m_presetCombo->currentData();
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Save Sampling Preset"), tr("Preset name:"), QLineEdit::Normal,
+                                               current.isValid() ? current.toString() : QString(), &ok).trimmed();
+    if (!ok || name.isEmpty())
+        return;
+    if (name.contains(QLatin1Char('/')) || name.contains(QLatin1Char('\\'))) {
+        QMessageBox::warning(this, tr("Warning"), tr("A preset name cannot contain / or \\."));
+        return;
+    }
+    QSettings settings;
+    settings.beginGroup(kPresetGroup);
+    if (settings.childGroups().contains(name)
+        && QMessageBox::question(this, tr("Save Sampling Preset"), tr("Replace the preset \"%1\"?").arg(name))
+               != QMessageBox::Yes)
+        return;
+    settings.remove(name);
+    settings.beginGroup(name);
+    for (const SamplingField &f : samplingFields(ui)) {
+        settings.setValue(QLatin1String(f.key), f.check->isChecked());
+        settings.setValue(QLatin1String(f.key) + QLatin1String("Value"), spinValue(f.spin));
+    }
+    settings.endGroup();
+    settings.endGroup();
+    settings.sync();
+    updatePresetCombo();
+}
+
+void MainWindow::deleteSamplingPreset()
+{
+    const QString name = m_presetCombo->currentData().toString();
+    if (name.isEmpty()
+        || QMessageBox::question(this, tr("Delete Sampling Preset"), tr("Delete the preset \"%1\"?").arg(name))
+               != QMessageBox::Yes)
+        return;
+    QSettings settings;
+    settings.beginGroup(kPresetGroup);
+    settings.remove(name);
+    settings.endGroup();
+    settings.sync();
+    updatePresetCombo();
 }
 
 void MainWindow::updatePendingChanges()
