@@ -41,6 +41,7 @@ ChartWidget::ChartWidget(QWidget *parent)
     : QWidget(parent)
 {
     setMouseTracking(true);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAttribute(Qt::WA_OpaquePaintEvent, false);
 }
 

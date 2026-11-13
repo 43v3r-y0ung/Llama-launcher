@@ -2,7 +2,7 @@ Llama Launcher is a lightweight and intuitive C++/Qt GUI wrapper for the llama-s
 
 Key Features
 
-    Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with the Start/Stop button and the server status always visible below them.
+    Compact tabbed window: Model, Server, Advanced, Monitor, Log and Launcher tabs, with a compact Start/Stop button and a menu (Start, Stop, Restart, Quit) at the right end of the tab bar and the server status always visible below the tabs.
     Model Management:
         Model list: scans a models folder (recursively) for .gguf files and remembers recently used models from elsewhere. Multimodal projectors (mmproj) and the extra parts of split models are hidden.
         Model info read straight from the GGUF header: name, size, layer count, native context length and, for Mixture-of-Experts models, the number of experts.
@@ -30,7 +30,7 @@ Key Features
         Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
     Deep KDE Plasma Integration:
         System Tray Support: Runs quietly in the background with a dedicated tray icon.
-        Minimize to Tray: Closing the main window hides the application to the tray instead of terminating the server.
+        Minimize to Tray: Closing the main window hides the application to the tray instead of terminating the server. To quit, use Quit in the menu (Ctrl+Q) or Exit in the tray menu; if the server is running, the launcher asks before stopping it.
         Single instance: starting the launcher again (e.g. from the application menu) brings up the window of the one already running instead of starting a second server.
         The server never outlives the launcher: logging out or a kill signal stops it cleanly, and if the launcher is killed outright or crashes, the kernel stops the server too, so it does not keep the port, RAM and VRAM.
         Dynamic Tooltips: Hover over the tray icon to see real-time server status, the loaded model and its URL.
@@ -110,7 +110,7 @@ How to Use
     Check the model info and VRAM hint; for large MoE models try "MoE experts on CPU".
     Enable Auto for Context Size and GPU Layers to let the launcher find the optimal settings.
     Optionally fine-tune the model on the Advanced tab (e.g. a q8_0 KV cache to fit a longer context into VRAM).
-    Click Start Llama Server.
+    Click Start Server at the right end of the tab bar.
     By default, the server will be accessible at http://127.0.0.1:8080 (change the port on the Server tab).
     Watch speed and resource use on the Monitor tab; the server output is on the Log tab.
 

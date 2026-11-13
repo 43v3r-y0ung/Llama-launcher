@@ -14,6 +14,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
+#include <QToolButton>
 #include <QUrl>
 #include <functional>
 
@@ -42,7 +43,6 @@ private slots:
     void on_serverBrowseButton_clicked();
     void on_refreshDevicesButton_clicked();
     void on_modelsDirButton_clicked();
-    void on_startButton_clicked();
     void on_openBrowserButton_clicked();
     void on_copyUrlButton_clicked();
     void on_generateKeyButton_clicked();
@@ -64,6 +64,10 @@ private slots:
     void updateFitWarning();
     void checkServerHealth();
     void toggleWindowVisibility();
+    void toggleServer();
+    void restartServer();
+    void requestQuit();
+    void setupCornerControls();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -80,6 +84,10 @@ private:
     QAction *m_startAction = nullptr;
     QAction *m_stopAction = nullptr;
     QAction *m_openAction = nullptr;
+    QToolButton *m_startStopButton = nullptr; // in the corner of the tab bar
+    QAction *m_menuStartAction = nullptr;
+    QAction *m_menuStopAction = nullptr;
+    QAction *m_menuRestartAction = nullptr;
     QNetworkAccessManager *m_networkManager;
     QTimer *m_healthTimer;
     QTimer *m_killTimer;         // force-kills the server if it ignores SIGTERM

@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QHBoxLayout>
 #include <QIntValidator>
 #include <QLocale>
 #include <QMessageBox>
@@ -26,6 +27,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QThread>
+#include <QToolButton>
 
 #include <cmath>
 #include <limits>
@@ -136,6 +138,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->refreshDevicesButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
     ui->copyLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->clearLogButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-clear-history")));
+    setupCornerControls();
 
     ui->threadsSpin->setValue(qMax(1, QThread::idealThreadCount() / 2));
     for (QCheckBox *check : {ui->gpuAutoCheck, ui->threadsAutoCheck, ui->batchAutoCheck, ui->parallelAutoCheck,
@@ -417,7 +420,7 @@ void MainWindow::setupSystemTray()
     m_trayMenu->addSeparator();
     m_trayMenu->addAction(tr("Show/Restore"), this, &MainWindow::toggleWindowVisibility);
     m_trayMenu->addSeparator();
-    m_trayMenu->addAction(tr("Exit"), this, &MainWindow::quitApplication);
+    m_trayMenu->addAction(tr("Exit"), this, &MainWindow::requestQuit);
 
     m_trayIcon = new QSystemTrayIcon(QIcon(QStringLiteral(":/rsc/llama-launcher.svg")), this);
     m_trayIcon->setToolTip(tr("Llama Launcher"));
@@ -453,6 +456,59 @@ void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
 {
     if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
         toggleWindowVisibility();
+}
+
+// Start/Stop and the window menu sit at the right end of the tab bar: starting and stopping
+// is occasional, so it does not deserve a full-width button.
+void MainWindow::setupCornerControls()
+{
+    m_startStopButton = new QToolButton(this);
+    m_startStopButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(m_startStopButton, &QToolButton::clicked, this, &MainWindow::toggleServer);
+
+    auto *menu = new QMenu(this);
+    m_menuStartAction = menu->addAction(QIcon::fromTheme(QStringLiteral("media-playback-start")), tr("Start Server"),
+                                        this, &MainWindow::startServer);
+    m_menuStopAction = menu->addAction(QIcon::fromTheme(QStringLiteral("media-playback-stop")), tr("Stop Server"),
+                                       this, [this] { m_restartPending = false; stopServer(); });
+    m_menuRestartAction = menu->addAction(QIcon::fromTheme(QStringLiteral("view-refresh")), tr("Restart Server"),
+                                          this, &MainWindow::restartServer);
+    menu->addSeparator();
+    QAction *quit = menu->addAction(QIcon::fromTheme(QStringLiteral("application-exit")), tr("Quit"),
+                                    this, &MainWindow::requestQuit);
+    quit->setShortcut(QKeySequence::Quit);
+    addAction(quit); // Ctrl+Q works without opening the menu
+
+    auto *menuButton = new QToolButton(this);
+    menuButton->setIcon(QIcon::fromTheme(QStringLiteral("application-menu")));
+    if (menuButton->icon().isNull())
+        menuButton->setText(QStringLiteral("\u2630"));
+    menuButton->setToolTip(tr("Menu"));
+    menuButton->setPopupMode(QToolButton::InstantPopup);
+    menuButton->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; }"));
+    menuButton->setMenu(menu);
+
+    auto *corner = new QWidget(this);
+    auto *layout = new QHBoxLayout(corner);
+    layout->setContentsMargins(0, 0, 0, 2);
+    layout->setSpacing(4);
+    layout->addWidget(m_startStopButton);
+    layout->addWidget(menuButton);
+    ui->tabWidget->setCornerWidget(corner, Qt::TopRightCorner);
+}
+
+void MainWindow::requestQuit()
+{
+    if (m_process->state() != QProcess::NotRunning) {
+        if (isHidden())
+            bringToFront(); // the question must not pop up out of nowhere over other windows
+        const auto answer = QMessageBox::question(this, tr("Quit Llama Launcher"),
+                                                  tr("The server is running. Quit and stop it?"),
+                                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+    quitApplication();
 }
 
 void MainWindow::quitApplication()
@@ -557,7 +613,12 @@ void MainWindow::setStatus(Status status)
     updateMonitorActivity();
     ui->openBrowserButton->setEnabled(ready && m_runningWebUi);
     ui->copyUrlButton->setEnabled(status != Status::Stopped);
-    ui->startButton->setText(running ? tr("Stop Llama Server") : tr("Start Llama Server"));
+    m_startStopButton->setText(running ? tr("Stop Server") : tr("Start Server"));
+    m_startStopButton->setIcon(QIcon::fromTheme(running ? QStringLiteral("media-playback-stop")
+                                                        : QStringLiteral("media-playback-start")));
+    m_menuStartAction->setEnabled(!running);
+    m_menuStopAction->setEnabled(running);
+    m_menuRestartAction->setEnabled(running);
 
     if (m_trayIcon) {
         m_startAction->setEnabled(!running);
@@ -751,7 +812,7 @@ void MainWindow::on_keyBrowseButton_clicked()
 // Server process
 // ---------------------------------------------------------------------------
 
-void MainWindow::on_startButton_clicked()
+void MainWindow::toggleServer()
 {
     if (m_process->state() != QProcess::NotRunning) {
         m_restartPending = false; // an explicit Stop wins over a restart requested from a hint
@@ -1046,16 +1107,21 @@ void MainWindow::applyHintFix(LogAdvisor::HintId id)
     updateLogAdvice();
 }
 
+void MainWindow::restartServer()
+{
+    if (m_process->state() == QProcess::NotRunning) {
+        startServer();
+    } else {
+        m_restartPending = true; // handleProcessFinished() starts it again
+        updateLogAdvice();
+        stopServer();
+    }
+}
+
 void MainWindow::onLogAdviceLinkActivated(const QString &link)
 {
     if (link == QLatin1String("restart")) {
-        if (m_process->state() == QProcess::NotRunning) {
-            startServer();
-        } else {
-            m_restartPending = true; // handleProcessFinished() starts it again
-            updateLogAdvice();
-            stopServer();
-        }
+        restartServer();
     } else if (link.startsWith(QLatin1String("fix:"))) {
         applyHintFix(LogAdvisor::HintId(link.mid(4).toInt()));
     }
