@@ -140,7 +140,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->threadsSpin->setValue(qMax(1, QThread::idealThreadCount() / 2));
     for (QCheckBox *check : {ui->gpuAutoCheck, ui->threadsAutoCheck, ui->batchAutoCheck, ui->parallelAutoCheck,
                              ui->reasoningUnlimitedCheck, ui->mmprojCheck, ui->tempCheck, ui->topPCheck,
-                             ui->topKCheck, ui->minPCheck})
+                             ui->topKCheck, ui->minPCheck, ui->presencePenaltyCheck, ui->frequencyPenaltyCheck})
         connect(check, &QCheckBox::toggled, this, &MainWindow::updateUiState);
     for (QComboBox *combo : {ui->reasoningCombo, ui->kvCacheCombo, ui->flashAttnCombo})
         connect(combo, &QComboBox::currentIndexChanged, this, &MainWindow::updateUiState);
@@ -845,6 +845,10 @@ QStringList MainWindow::buildArguments() const
         arguments << "--top-k" << QString::number(ui->topKSpin->value());
     if (ui->minPCheck->isChecked())
         arguments << "--min-p" << QString::number(ui->minPSpin->value());
+    if (ui->presencePenaltyCheck->isChecked())
+        arguments << "--presence-penalty" << QString::number(ui->presencePenaltySpin->value());
+    if (ui->frequencyPenaltyCheck->isChecked())
+        arguments << "--frequency-penalty" << QString::number(ui->frequencyPenaltySpin->value());
 
     if (ui->metricsCheck->isChecked())
         arguments << "--metrics";
@@ -1473,6 +1477,8 @@ void MainWindow::updateUiState()
     ui->topPSpin->setEnabled(ui->topPCheck->isChecked());
     ui->topKSpin->setEnabled(ui->topKCheck->isChecked());
     ui->minPSpin->setEnabled(ui->minPCheck->isChecked());
+    ui->presencePenaltySpin->setEnabled(ui->presencePenaltyCheck->isChecked());
+    ui->frequencyPenaltySpin->setEnabled(ui->frequencyPenaltyCheck->isChecked());
 
     const bool kvNeedsFa = ui->kvCacheCombo->currentIndex() > 0 && ui->flashAttnCombo->currentIndex() == FaOff;
     ui->kvWarningLabel->setVisible(kvNeedsFa);
@@ -1607,6 +1613,10 @@ void MainWindow::saveModelSettings(const QString &modelPath)
     settings.setValue("topKValue", ui->topKSpin->value());
     settings.setValue("minP", ui->minPCheck->isChecked());
     settings.setValue("minPValue", ui->minPSpin->value());
+    settings.setValue("presencePenalty", ui->presencePenaltyCheck->isChecked());
+    settings.setValue("presencePenaltyValue", ui->presencePenaltySpin->value());
+    settings.setValue("frequencyPenalty", ui->frequencyPenaltyCheck->isChecked());
+    settings.setValue("frequencyPenaltyValue", ui->frequencyPenaltySpin->value());
     settings.setValue("metrics", ui->metricsCheck->isChecked());
     settings.setValue("noWarmup", ui->noWarmupCheck->isChecked());
     settings.endGroup();
@@ -1660,6 +1670,10 @@ void MainWindow::loadModelSettings(const QString &modelPath)
     ui->topKSpin->setValue(settings.value("topKValue", 40).toInt());
     ui->minPCheck->setChecked(settings.value("minP", false).toBool());
     ui->minPSpin->setValue(settings.value("minPValue", 0.05).toDouble());
+    ui->presencePenaltyCheck->setChecked(settings.value("presencePenalty", false).toBool());
+    ui->presencePenaltySpin->setValue(settings.value("presencePenaltyValue", 1.5).toDouble());
+    ui->frequencyPenaltyCheck->setChecked(settings.value("frequencyPenalty", false).toBool());
+    ui->frequencyPenaltySpin->setValue(settings.value("frequencyPenaltyValue", 0.5).toDouble());
     ui->metricsCheck->setChecked(settings.value("metrics", false).toBool());
     ui->noWarmupCheck->setChecked(settings.value("noWarmup", false).toBool());
     settings.endGroup();
@@ -1727,6 +1741,10 @@ int MainWindow::migrateExtraArgs()
         else if (is({"--top-p"}) && isNum) valued([&] { ui->topPCheck->setChecked(true); ui->topPSpin->setValue(dv); });
         else if (is({"--top-k"}) && isInt) valued([&] { ui->topKCheck->setChecked(true); ui->topKSpin->setValue(iv); });
         else if (is({"--min-p"}) && isNum) valued([&] { ui->minPCheck->setChecked(true); ui->minPSpin->setValue(dv); });
+        else if (is({"--presence-penalty"}) && isNum && dv >= -2 && dv <= 2)
+            valued([&] { ui->presencePenaltyCheck->setChecked(true); ui->presencePenaltySpin->setValue(dv); });
+        else if (is({"--frequency-penalty"}) && isNum && dv >= -2 && dv <= 2)
+            valued([&] { ui->frequencyPenaltyCheck->setChecked(true); ui->frequencyPenaltySpin->setValue(dv); });
         else if (is({"--metrics"})) flag(ui->metricsCheck, true);
         else if (is({"--no-warmup"})) flag(ui->noWarmupCheck, true);
         else if (is({"--warmup"})) flag(ui->noWarmupCheck, false);

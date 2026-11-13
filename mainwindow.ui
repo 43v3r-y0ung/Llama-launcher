@@ -997,6 +997,64 @@
                                   </property>
                                 </widget>
                               </item>
+                              <item row="3" column="0">
+                                <widget class="QCheckBox" name="presencePenaltyCheck">
+                                  <property name="text">
+                                    <string>Presence penalty</string>
+                                  </property>
+                                  <property name="toolTip">
+                                    <string>Penalizes tokens that already appeared, regardless of how often (--presence-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</string>
+                                  </property>
+                                </widget>
+                              </item>
+                              <item row="3" column="1">
+                                <widget class="QDoubleSpinBox" name="presencePenaltySpin">
+                                  <property name="decimals">
+                                    <number>2</number>
+                                  </property>
+                                  <property name="minimum">
+                                    <double>-2</double>
+                                  </property>
+                                  <property name="maximum">
+                                    <double>2</double>
+                                  </property>
+                                  <property name="value">
+                                    <double>1.5</double>
+                                  </property>
+                                  <property name="singleStep">
+                                    <double>0.1</double>
+                                  </property>
+                                </widget>
+                              </item>
+                              <item row="3" column="3">
+                                <widget class="QCheckBox" name="frequencyPenaltyCheck">
+                                  <property name="text">
+                                    <string>Frequency penalty</string>
+                                  </property>
+                                  <property name="toolTip">
+                                    <string>Penalizes tokens in proportion to how often they already appeared (--frequency-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</string>
+                                  </property>
+                                </widget>
+                              </item>
+                              <item row="3" column="4">
+                                <widget class="QDoubleSpinBox" name="frequencyPenaltySpin">
+                                  <property name="decimals">
+                                    <number>2</number>
+                                  </property>
+                                  <property name="minimum">
+                                    <double>-2</double>
+                                  </property>
+                                  <property name="maximum">
+                                    <double>2</double>
+                                  </property>
+                                  <property name="value">
+                                    <double>0.5</double>
+                                  </property>
+                                  <property name="singleStep">
+                                    <double>0.1</double>
+                                  </property>
+                                </widget>
+                              </item>
                             </layout>
                           </widget>
                         </item>
