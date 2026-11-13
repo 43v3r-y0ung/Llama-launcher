@@ -112,6 +112,7 @@ void Monitor::setServer(const QUrl &baseUrl, const QString &apiKey, const QSslCe
     m_prevDecoded = -1;
     m_genTps = 0;
     m_busy = false;
+    m_slotsSeenMs = 0;
     if (baseUrl.isEmpty()) {
         if (m_slotsReply)
             m_slotsReply->abort();
@@ -123,6 +124,7 @@ void Monitor::resetServerStats()
 {
     m_genTps = 0;
     m_busy = false;
+    m_slotsSeenMs = 0;
     m_ctxUsed = m_ctxSize = -1;
     m_prevDecoded = -1;
     m_promptTps = 0;
@@ -164,6 +166,8 @@ void Monitor::sample()
         }
         s.genTps = logGenerating ? logTps : (m_serverUrl.isEmpty() ? 0 : m_genTps);
         s.busy = m_busy || prompting || logGenerating;
+        // Stale after a couple of missed polls: then nobody knows whether the server is busy.
+        s.busySlots = !m_serverUrl.isEmpty() && s.timeMs - m_slotsSeenMs < 3 * kIntervalMs ? m_busySlots : -1;
         s.ctxUsed = m_ctxUsed;
         s.ctxSize = m_ctxSize;
         s.lastGenTps = m_lastGenTps;
@@ -348,11 +352,13 @@ void Monitor::handleSlotsReply(QNetworkReply *reply)
 
     qint64 decoded = 0;
     bool busy = false;
+    int busySlots = 0;
     double fullest = -1;
     for (const QJsonValue &v : slotList) {
         const QJsonObject slot = v.toObject();
         const bool processing = slot.value(QLatin1String("is_processing")).toBool();
         busy |= processing;
+        busySlots += processing ? 1 : 0;
         // Only running slots count: an idle slot keeps the n_decoded of its last request.
         if (processing)
             decoded += slot.value(QLatin1String("next_token")).toArray().at(0).toObject()
@@ -388,6 +394,8 @@ void Monitor::handleSlotsReply(QNetworkReply *reply)
         m_promptProgress = -1;
     m_prevDecodedMs = now;
     m_busy = busy;
+    m_busySlots = busySlots;
+    m_slotsSeenMs = now;
 }
 
 void Monitor::feedLogLine(const QString &line)

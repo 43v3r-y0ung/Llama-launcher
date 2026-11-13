@@ -68,6 +68,7 @@ private slots:
     void toggleWindowVisibility();
     void toggleServer();
     void restartServer();
+    void setWhenIdle(int action); // WhenIdle; toggles the pending action
     void requestQuit();
     void setupCornerControls();
 
@@ -93,6 +94,12 @@ private:
     QAction *m_menuStartAction = nullptr;
     QAction *m_menuStopAction = nullptr;
     QAction *m_menuRestartAction = nullptr;
+    QAction *m_restartIdleAction = nullptr;
+    QAction *m_stopIdleAction = nullptr;
+    enum WhenIdle { IdleNothing, IdleRestart, IdleStop };
+    WhenIdle m_whenIdle = IdleNothing; // done once no request is being processed
+    int m_idleSamples = 0;
+    int m_busySlots = -1;        // from the latest monitor sample
     QNetworkAccessManager *m_networkManager;
     QTimer *m_healthTimer;
     QTimer *m_killTimer;         // force-kills the server if it ignores SIGTERM
@@ -127,6 +134,7 @@ private:
     void updateMonitorActivity(); // sample only while someone can see it or the server runs
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
+    void updateStatusText();     // status line and tray tooltip
     void updateLogAdvice();
     void onLogAdviceLinkActivated(const QString &link);
     static QString hintFixLabel(LogAdvisor::HintId id); // empty when the hint has no one-click fix

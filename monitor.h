@@ -43,6 +43,7 @@ struct MonitorSample
     double lastGenTps = -1;         // final speeds of the last finished request, from the log
     double lastPromptTps = -1;
     bool busy = false;              // a slot is processing a request
+    int busySlots = -1;             // requests being processed according to /slots; -1 if /slots is not answering
     int ctxUsed = -1, ctxSize = -1; // tokens in the fullest slot
 };
 
@@ -118,6 +119,8 @@ private:
     qint64 m_prevDecodedMs = 0;
     double m_genTps = 0;
     bool m_busy = false;
+    int m_busySlots = 0;
+    qint64 m_slotsSeenMs = 0;       // last successful /slots reply
     int m_ctxUsed = -1, m_ctxSize = -1;
 
     // From the log

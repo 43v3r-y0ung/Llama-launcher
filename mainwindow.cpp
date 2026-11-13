@@ -379,6 +379,27 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
         ui->serverStatsLabel->setText(tr("The server is not running."));
         return;
     }
+    if (s.busySlots != m_busySlots) {
+        m_busySlots = s.busySlots;
+        updateStatusText();
+    }
+    if (m_whenIdle != IdleNothing && m_status == Status::Running) {
+        // Two idle readings in a row, so a request that is just being handed over is not cut off.
+        // Without /slots (busySlots -1) nobody can tell, so keep waiting.
+        const bool idle = s.busySlots == 0 && !s.busy;
+        m_idleSamples = idle ? m_idleSamples + 1 : 0;
+        if (m_idleSamples >= 2) {
+            const WhenIdle what = m_whenIdle;
+            m_whenIdle = IdleNothing;
+            m_idleSamples = 0;
+            ui->consoleOutput->appendPlainText(tr("The server is idle now."));
+            if (what == IdleRestart)
+                restartServer();
+            else
+                stopServer();
+            updateStatusText();
+        }
+    }
     QStringList parts;
     if (s.promptProgress >= 0)
         parts << tr("Reading prompt: <b>%1 %</b> at %2 tok/s")
@@ -460,6 +481,11 @@ void MainWindow::setupCornerControls()
                                        this, [this] { m_restartPending = false; stopServer(); });
     m_menuRestartAction = menu->addAction(QIcon::fromTheme(QStringLiteral("view-refresh")), tr("Restart Server"),
                                           this, &MainWindow::restartServer);
+    // Wait for the requests in progress to finish first; choosing it again cancels it.
+    m_restartIdleAction = menu->addAction(tr("Restart Server When Idle"), this, [this] { setWhenIdle(IdleRestart); });
+    m_restartIdleAction->setCheckable(true);
+    m_stopIdleAction = menu->addAction(tr("Stop Server When Idle"), this, [this] { setWhenIdle(IdleStop); });
+    m_stopIdleAction->setCheckable(true);
     menu->addSeparator();
     menu->addAction(QIcon::fromTheme(QStringLiteral("system-reboot")), tr("Restart Launcher (Server Keeps Running)"),
                     this, &MainWindow::restartLauncher);
@@ -495,8 +521,9 @@ void MainWindow::requestQuit()
     if (isHidden())
         bringToFront(); // the question must not pop up out of nowhere over other windows
 
-    QMessageBox box(QMessageBox::Question, tr("Quit Llama Launcher"), tr("The server is running."),
-                    QMessageBox::NoButton, this);
+    const QString state = m_busySlots > 0 ? tr("The server is processing %n request(s).", nullptr, m_busySlots)
+                                          : tr("The server is running.");
+    QMessageBox box(QMessageBox::Question, tr("Quit Llama Launcher"), state, QMessageBox::NoButton, this);
     box.setInformativeText(tr("Stop it, or keep it running: the launcher picks it up again the next time it starts."));
     QPushButton *keep = box.addButton(tr("Keep Server Running"), QMessageBox::AcceptRole);
     QPushButton *stop = box.addButton(tr("Stop Server and Quit"), QMessageBox::DestructiveRole);
@@ -598,28 +625,11 @@ void MainWindow::setStatus(Status status)
     const Status previous = m_status;
     m_status = status;
     const bool running = m_server->isRunning();
-
-    QString text, color;
-    switch (status) {
-    case Status::Stopped:  text = tr("Stopped");  color = QStringLiteral("#7f8c8d"); break;
-    case Status::Starting: text = tr("Starting"); color = QStringLiteral("#e67e22"); break;
-    case Status::Loading:  text = tr("Loading model"); color = QStringLiteral("#e67e22"); break;
-    case Status::Running:  text = tr("Running");  color = QStringLiteral("#27ae60"); break;
+    if (!running) {
+        m_whenIdle = IdleNothing; // nothing left to wait for
+        m_busySlots = -1;
     }
-
-    QString html = QStringLiteral("<span style='color:%1'>&#9679;</span> <b>%2</b>").arg(color, text);
-    if (status != Status::Stopped) {
-        const QString url = serverUrl().toString();
-        // Links must not wrap in the middle when the status line wraps.
-        html += QStringLiteral(" &mdash; %1 &mdash; <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
-                    .arg(m_runningModelName.toHtmlEscaped(), url.toHtmlEscaped());
-        const QString lan = lanUrl().toString();
-        if (!lan.isEmpty())
-            html += QStringLiteral(" &middot; %1 <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
-                        .arg(tr("network:"), lan.toHtmlEscaped());
-    }
-    ui->statusLabel->setText(html);
-    ui->statusLabel->setOpenExternalLinks(true);
+    updateStatusText();
 
     const bool ready = status == Status::Running;
     if (ready && previous != Status::Running)
@@ -637,17 +647,13 @@ void MainWindow::setStatus(Status status)
     m_menuStartAction->setEnabled(!running);
     m_menuStopAction->setEnabled(running);
     m_menuRestartAction->setEnabled(running);
+    m_restartIdleAction->setEnabled(running);
+    m_stopIdleAction->setEnabled(running);
 
     if (m_trayIcon) {
         m_startAction->setEnabled(!running);
         m_stopAction->setEnabled(running);
         m_openAction->setEnabled(ready && m_runningWebUi);
-        QString tooltip = tr("Llama Launcher\nStatus: %1").arg(text);
-        if (status != Status::Stopped)
-            tooltip += tr("\nModel: %1\n%2").arg(m_runningModelName, serverUrl().toString());
-        if (status != Status::Stopped && !lanUrl().isEmpty())
-            tooltip += QLatin1Char('\n') + lanUrl().toString();
-        m_trayIcon->setToolTip(tooltip);
     }
 
     if (previous != Status::Running && status == Status::Running) {
@@ -657,6 +663,73 @@ void MainWindow::setStatus(Status status)
     }
 
     updateUiState();
+}
+
+void MainWindow::updateStatusText()
+{
+    QString text, color;
+    switch (m_status) {
+    case Status::Stopped:  text = tr("Stopped");  color = QStringLiteral("#7f8c8d"); break;
+    case Status::Starting: text = tr("Starting"); color = QStringLiteral("#e67e22"); break;
+    case Status::Loading:  text = tr("Loading model"); color = QStringLiteral("#e67e22"); break;
+    case Status::Running:  text = tr("Running");  color = QStringLiteral("#27ae60"); break;
+    }
+    QStringList notes; // shown after the status in both the window and the tray tooltip
+    if (m_status == Status::Running && m_busySlots > 0)
+        notes << tr("%n request(s) in progress", nullptr, m_busySlots);
+    if (m_whenIdle == IdleRestart)
+        notes << tr("restart when idle");
+    else if (m_whenIdle == IdleStop)
+        notes << tr("stop when idle");
+
+    QString html = QStringLiteral("<span style='color:%1'>&#9679;</span> <b>%2</b>").arg(color, text);
+    if (!notes.isEmpty())
+        html += QStringLiteral(" (%1)").arg(notes.join(QStringLiteral(", ")).toHtmlEscaped());
+    if (m_status != Status::Stopped) {
+        const QString url = serverUrl().toString();
+        // Links must not wrap in the middle when the status line wraps.
+        html += QStringLiteral(" &mdash; %1 &mdash; <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
+                    .arg(m_runningModelName.toHtmlEscaped(), url.toHtmlEscaped());
+        const QString lan = lanUrl().toString();
+        if (!lan.isEmpty())
+            html += QStringLiteral(" &middot; %1 <span style='white-space:nowrap'><a href='%2'>%2</a></span>")
+                        .arg(tr("network:"), lan.toHtmlEscaped());
+    }
+    ui->statusLabel->setText(html);
+    ui->statusLabel->setOpenExternalLinks(true);
+
+    m_restartIdleAction->setChecked(m_whenIdle == IdleRestart);
+    m_stopIdleAction->setChecked(m_whenIdle == IdleStop);
+
+    if (m_trayIcon) {
+        QString tooltip = tr("Llama Launcher\nStatus: %1").arg(text);
+        if (!notes.isEmpty())
+            tooltip += QStringLiteral(" (%1)").arg(notes.join(QStringLiteral(", ")));
+        if (m_status != Status::Stopped)
+            tooltip += tr("\nModel: %1\n%2").arg(m_runningModelName, serverUrl().toString());
+        if (m_status != Status::Stopped && !lanUrl().isEmpty())
+            tooltip += QLatin1Char('\n') + lanUrl().toString();
+        m_trayIcon->setToolTip(tooltip);
+    }
+}
+
+void MainWindow::setWhenIdle(int action)
+{
+    if (!m_server->isRunning())
+        return;
+    // Choosing the pending action again cancels it.
+    m_whenIdle = m_whenIdle == action ? IdleNothing : WhenIdle(action);
+    m_idleSamples = 0;
+    if (m_whenIdle != IdleNothing && m_status != Status::Running) {
+        // Still loading the model: no request can be in progress.
+        const WhenIdle what = m_whenIdle;
+        m_whenIdle = IdleNothing;
+        if (what == IdleRestart)
+            restartServer();
+        else
+            stopServer();
+    }
+    updateStatusText();
 }
 
 void MainWindow::on_openBrowserButton_clicked()
