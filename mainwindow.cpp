@@ -756,7 +756,9 @@ QStringList MainWindow::buildArguments() const
     // only with automatic GPU layers; otherwise turn it off rather than have it silently fail.
     arguments << "--fit" << (ui->gpuAutoCheck->isChecked() ? "on" : "off");
 
-    const QString device = ui->deviceCombo->currentData().toString();
+    // The device list is filled by an asynchronous --list-devices probe; a server started
+    // before it arrives (autostart) still has to use the saved device.
+    const QString device = ui->deviceCombo->count() > 0 ? ui->deviceCombo->currentData().toString() : m_savedDevice;
     if (!device.isEmpty())
         arguments << "--device" << device;
 
