@@ -30,6 +30,12 @@
 #include <cmath>
 #include <limits>
 
+#ifdef Q_OS_LINUX
+#include <csignal>
+#include <sys/prctl.h>
+#include <unistd.h>
+#endif
+
 namespace {
 
 constexpr int kMaxRecentModels = 10;
@@ -124,6 +130,7 @@ MainWindow::MainWindow(QWidget *parent)
     QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     ui->consoleOutput->setFont(mono);
     ui->logAdviceLabel->setVisible(false); // shown once the server log produces a hint
+    connect(ui->logAdviceLabel, &QLabel::linkActivated, this, &MainWindow::onLogAdviceLinkActivated);
     ui->openBrowserButton->setIcon(QIcon::fromTheme(QStringLiteral("internet-web-browser")));
     ui->copyUrlButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->refreshDevicesButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
@@ -168,6 +175,17 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Server output: stdout and stderr interleaved in the order they were written.
     m_process->setProcessChannelMode(QProcess::MergedChannels);
+#ifdef Q_OS_LINUX
+    // If the launcher dies without stopping the server (killed, crashed), the kernel sends the
+    // server SIGTERM, so it does not stay behind holding the port, RAM and VRAM. The signal is
+    // tied to the thread that started the process; the server is always started from the GUI thread.
+    const pid_t launcherPid = ::getpid();
+    m_process->setChildProcessModifier([launcherPid] {
+        ::prctl(PR_SET_PDEATHSIG, SIGTERM);
+        if (::getppid() != launcherPid) // the launcher was already gone before prctl()
+            ::_exit(1);
+    });
+#endif
     connect(m_process, &QProcess::readyReadStandardOutput, this, &MainWindow::readProcessOutput);
     connect(m_process, &QProcess::started, this, &MainWindow::handleProcessStarted);
     connect(m_process, &QProcess::errorOccurred, this, &MainWindow::handleProcessError);
@@ -419,11 +437,16 @@ void MainWindow::toggleWindowVisibility()
     if (isVisible() && !isMinimized()) {
         hide();
     } else {
-        show();
-        showNormal();
-        raise();
-        activateWindow();
+        bringToFront();
     }
+}
+
+void MainWindow::bringToFront()
+{
+    show();
+    showNormal();
+    raise();
+    activateWindow();
 }
 
 void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
@@ -730,10 +753,12 @@ void MainWindow::on_keyBrowseButton_clicked()
 
 void MainWindow::on_startButton_clicked()
 {
-    if (m_process->state() != QProcess::NotRunning)
+    if (m_process->state() != QProcess::NotRunning) {
+        m_restartPending = false; // an explicit Stop wins over a restart requested from a hint
         stopServer();
-    else
+    } else {
         startServer();
+    }
 }
 
 QStringList MainWindow::buildArguments() const
@@ -756,7 +781,9 @@ QStringList MainWindow::buildArguments() const
     // only with automatic GPU layers; otherwise turn it off rather than have it silently fail.
     arguments << "--fit" << (ui->gpuAutoCheck->isChecked() ? "on" : "off");
 
-    const QString device = ui->deviceCombo->currentData().toString();
+    // The device list is filled by an asynchronous --list-devices probe; a server started
+    // before it arrives (autostart) still has to use the saved device.
+    const QString device = ui->deviceCombo->count() > 0 ? ui->deviceCombo->currentData().toString() : m_savedDevice;
     if (!device.isEmpty())
         arguments << "--device" << device;
 
@@ -903,6 +930,8 @@ void MainWindow::startServer()
 
     ui->consoleOutput->clear();
     m_logAdvisor.reset();
+    m_appliedFixes.clear();
+    m_restartPending = false;
     updateLogAdvice();
     if (!tlsNote.isEmpty())
         ui->consoleOutput->appendPlainText(tlsNote);
@@ -948,14 +977,17 @@ void MainWindow::readProcessOutput()
         ui->consoleOutput->appendPlainText(trimmed);
         m_lastOutputLine = trimmed;
         m_monitor->feedLogLine(trimmed);
-        if (m_logAdvisor.feedLine(trimmed))
+        if (m_logAdvisor.feedLine(trimmed)) {
             updateLogAdvice();
+            const int count = int(m_logAdvisor.hints().size());
+            statusBar()->showMessage(tr("The server log has %n hint(s), see the Log tab", nullptr, count), 8000);
+        }
     }
 }
 
 void MainWindow::updateLogAdvice()
 {
-    const QStringList &hints = m_logAdvisor.hints();
+    const QList<LogAdvisor::Hint> &hints = m_logAdvisor.hints();
     ui->logAdviceLabel->setVisible(!hints.isEmpty());
     if (hints.isEmpty()) {
         ui->logAdviceLabel->clear();
@@ -963,11 +995,68 @@ void MainWindow::updateLogAdvice()
     }
 
     QString html = QStringLiteral("<b>%1</b><ul style='margin:0'>").arg(tr("Hints from the server log:").toHtmlEscaped());
-    for (const QString &hint : hints)
-        html += QStringLiteral("<li>%1</li>").arg(hint.toHtmlEscaped());
+    for (const LogAdvisor::Hint &hint : hints) {
+        html += QStringLiteral("<li>") + hint.text.toHtmlEscaped();
+        const QString fix = hintFixLabel(hint.id);
+        if (m_appliedFixes.contains(hint.id))
+            html += QStringLiteral(" <i>(%1)</i>").arg(tr("changed, takes effect after a restart").toHtmlEscaped());
+        else if (!fix.isEmpty())
+            html += QStringLiteral(" <a href='fix:%1'>%2</a>").arg(int(hint.id)).arg(fix.toHtmlEscaped());
+        html += QStringLiteral("</li>");
+    }
     html += QStringLiteral("</ul>");
+    if (!m_appliedFixes.isEmpty() && !m_restartPending) {
+        const bool running = m_process->state() != QProcess::NotRunning;
+        html += QStringLiteral("<a href='restart'>%1</a>")
+                    .arg((running ? tr("Restart the server") : tr("Start the server")).toHtmlEscaped());
+    }
     ui->logAdviceLabel->setText(QStringLiteral("<span style='color:#d35400'>&#9888;</span> ") + html);
-    statusBar()->showMessage(tr("The server log has %n hint(s), see the Log tab", nullptr, int(hints.size())), 8000);
+}
+
+QString MainWindow::hintFixLabel(LogAdvisor::HintId id)
+{
+    switch (id) {
+    case LogAdvisor::HintId::FitSkipped: return tr("Set GPU layers to Auto");
+    case LogAdvisor::HintId::ContextShift: return tr("Turn off Context Shift");
+    case LogAdvisor::HintId::Mmap: return tr("Turn on --no-mmap");
+    // Flash Attention: the server already runs without it, and setting it to Off by hand
+    // would only add the "quantized KV cache needs Flash Attention" warning.
+    case LogAdvisor::HintId::FlashAttnOff:
+    case LogAdvisor::HintId::OutOfMemory: // several possible remedies, the user has to choose
+        break;
+    }
+    return {};
+}
+
+void MainWindow::applyHintFix(LogAdvisor::HintId id)
+{
+    switch (id) {
+    case LogAdvisor::HintId::FitSkipped: ui->gpuAutoCheck->setChecked(true); break;
+    case LogAdvisor::HintId::ContextShift: ui->ctxShiftCheck->setChecked(false); break;
+    case LogAdvisor::HintId::Mmap: ui->noMmapCheck->setChecked(true); break;
+    case LogAdvisor::HintId::FlashAttnOff:
+    case LogAdvisor::HintId::OutOfMemory:
+        return;
+    }
+    saveSettings();
+    if (!m_appliedFixes.contains(id))
+        m_appliedFixes << id;
+    updateLogAdvice();
+}
+
+void MainWindow::onLogAdviceLinkActivated(const QString &link)
+{
+    if (link == QLatin1String("restart")) {
+        if (m_process->state() == QProcess::NotRunning) {
+            startServer();
+        } else {
+            m_restartPending = true; // handleProcessFinished() starts it again
+            updateLogAdvice();
+            stopServer();
+        }
+    } else if (link.startsWith(QLatin1String("fix:"))) {
+        applyHintFix(LogAdvisor::HintId(link.mid(4).toInt()));
+    }
 }
 
 void MainWindow::on_copyLogButton_clicked()
@@ -1021,6 +1110,13 @@ void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitSt
         if (!m_lastOutputLine.isEmpty())
             msg += QLatin1Char('\n') + m_lastOutputLine.right(200);
         notify(tr("Llama server stopped"), msg, QSystemTrayIcon::Warning);
+    }
+
+    if (m_restartPending) {
+        m_restartPending = false;
+        QTimer::singleShot(0, this, &MainWindow::startServer); // after QProcess has finished its own handling
+    } else {
+        updateLogAdvice(); // "Restart the server" becomes "Start the server"
     }
 }
 

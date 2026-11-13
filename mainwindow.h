@@ -34,6 +34,8 @@ public:
 public slots:
     void startServer();
     void stopServer();
+    void bringToFront();    // show and raise the window, e.g. when the launcher is started again
+    void quitApplication(); // stops the server and saves settings before quitting
 
 private slots:
     void on_browseButton_clicked();
@@ -62,7 +64,6 @@ private slots:
     void updateFitWarning();
     void checkServerHealth();
     void toggleWindowVisibility();
-    void quitApplication();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -95,6 +96,8 @@ private:
     QByteArray m_outputBuffer;    // incomplete trailing line of server output
     QString m_lastOutputLine;
     LogAdvisor m_logAdvisor;     // hints from known server warnings, shown on the Log tab
+    QList<LogAdvisor::HintId> m_appliedFixes; // hints whose fix was applied during this run
+    bool m_restartPending = false; // start the server again once it has stopped
 
     QString m_currentModelPath;  // model whose per-model settings are shown in the UI
     GgufInfo m_modelInfo;
@@ -111,6 +114,9 @@ private:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
     void updateLogAdvice();
+    void onLogAdviceLinkActivated(const QString &link);
+    static QString hintFixLabel(LogAdvisor::HintId id); // empty when the hint has no one-click fix
+    void applyHintFix(LogAdvisor::HintId id);
     void notify(const QString &title, const QString &message,
                 QSystemTrayIcon::MessageIcon icon = QSystemTrayIcon::Information);
     QUrl serverUrl() const;
