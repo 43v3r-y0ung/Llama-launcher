@@ -1018,7 +1018,6 @@ QString MainWindow::hintFixLabel(LogAdvisor::HintId id)
     switch (id) {
     case LogAdvisor::HintId::FitSkipped: return tr("Set GPU layers to Auto");
     case LogAdvisor::HintId::ContextShift: return tr("Turn off Context Shift");
-    case LogAdvisor::HintId::Mmap: return tr("Turn on --no-mmap");
     // Flash Attention: the server already runs without it, and setting it to Off by hand
     // would only add the "quantized KV cache needs Flash Attention" warning.
     case LogAdvisor::HintId::FlashAttnOff:
@@ -1033,7 +1032,6 @@ void MainWindow::applyHintFix(LogAdvisor::HintId id)
     switch (id) {
     case LogAdvisor::HintId::FitSkipped: ui->gpuAutoCheck->setChecked(true); break;
     case LogAdvisor::HintId::ContextShift: ui->ctxShiftCheck->setChecked(false); break;
-    case LogAdvisor::HintId::Mmap: ui->noMmapCheck->setChecked(true); break;
     case LogAdvisor::HintId::FlashAttnOff:
     case LogAdvisor::HintId::OutOfMemory:
         return;

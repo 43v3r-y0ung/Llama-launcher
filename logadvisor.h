@@ -15,7 +15,6 @@ public:
         FitSkipped,    // --fit gave up because -ngl was set by hand
         FlashAttnOff,  // the server turned Flash Attention off by itself
         ContextShift,  // the model does not support context shifting
-        Mmap,          // CPU tensor overrides with a memory-mapped model file
         OutOfMemory,
     };
 

@@ -47,13 +47,6 @@ bool LogAdvisor::feedLine(const QString &line)
             tr("This model does not support Context Shift, so that option has no effect and can be turned off."));
     }
 
-    // llama_model_loader: tensor overrides to CPU are used with mmap enabled - consider using --load-mode none
-    if (line.contains(QLatin1String("tensor overrides to CPU are used with mmap enabled"))) {
-        add(HintId::Mmap,
-            tr("Part of the model (for example MoE experts) is kept on the CPU while the file is memory-mapped. "
-               "Loading the model fully (Advanced tab, --no-mmap) may be faster."));
-    }
-
     // ggml_vulkan: Device memory allocation of size ... failed / cudaMalloc failed: out of memory / ...
     if (line.contains(QLatin1String("out of memory"), Qt::CaseInsensitive)
         || (line.contains(QLatin1String("allocat"), Qt::CaseInsensitive)

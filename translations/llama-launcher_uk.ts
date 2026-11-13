@@ -45,11 +45,6 @@
         <translation>Ця модель не підтримує Context Shift, тож ця опція не діє і її можна вимкнути.</translation>
     </message>
     <message>
-        <location filename="../logadvisor.cpp" line="53"/>
-        <source>Part of the model (for example MoE experts) is kept on the CPU while the file is memory-mapped. Loading the model fully (Advanced tab, --no-mmap) may be faster.</source>
-        <translation>Частина моделі (наприклад, MoE-експерти) лишається на CPU, а файл відображено в пам&apos;ять (mmap). Повне завантаження моделі (вкладка «Додатково», --no-mmap) може бути швидшим.</translation>
-    </message>
-    <message>
         <location filename="../logadvisor.cpp" line="62"/>
         <source>Not enough memory for the requested settings. Lower the context size or the number of GPU layers, use a quantized KV cache, or keep MoE experts on the CPU.</source>
         <translation>Недостатньо пам&apos;яті для вибраних налаштувань. Зменште розмір контексту або кількість шарів на GPU, використайте квантований KV-кеш або залиште MoE-експертів на CPU.</translation>
@@ -990,11 +985,6 @@ Model: %1
         <location filename="../mainwindow.cpp" line="1020"/>
         <source>Turn off Context Shift</source>
         <translation>Вимкнути Context Shift</translation>
-    </message>
-    <message>
-        <location filename="../mainwindow.cpp" line="1021"/>
-        <source>Turn on --no-mmap</source>
-        <translation>Увімкнути --no-mmap</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1065"/>

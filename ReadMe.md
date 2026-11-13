@@ -50,7 +50,7 @@ Key Features
         Support for Context Shift (--context-shift) to handle infinite text generation efficiently.
         Option to disable the built-in Web UI to save system resources.
         Integrated log viewer (Log tab) with Copy and Clear buttons; it comes to the front when the server fails to start or stops unexpectedly.
-        Hints from the server log: known llama-server warnings (automatic fitting skipped, Flash Attention turned off, no Context Shift support, MoE experts on the CPU with a memory-mapped file, out of memory) are explained above the log. Where there is one obvious fix, a link next to the hint applies it (e.g. "Turn off Context Shift"), and "Restart the server" starts it again with the new settings.
+        Hints from the server log: known llama-server warnings (automatic fitting skipped, Flash Attention turned off, no Context Shift support, out of memory) are explained above the log. Where there is one obvious fix, a link next to the hint applies it (e.g. "Turn off Context Shift"), and "Restart the server" starts it again with the new settings.
         Configurable server port (also used for the health check).
         Extra Arguments field (Advanced tab) for any other llama-server flags (e.g. --seed 42 --repeat-penalty 1.1), appended last so they can override defaults.
     Localization: English and Ukrainian; the language follows the system locale.
