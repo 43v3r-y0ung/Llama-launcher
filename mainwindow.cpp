@@ -232,6 +232,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
     setupCharts();
     setupSamplingPresets();
+    // Log tab: filter by text, or show only warnings and errors.
+    m_logFilterEdit = new QLineEdit(this);
+    m_logFilterEdit->setPlaceholderText(tr("Filter"));
+    m_logFilterEdit->setClearButtonEnabled(true);
+    m_logFilterEdit->setMaximumWidth(260);
+    m_logProblemsCheck = new QCheckBox(tr("Warnings and errors only"), this);
+    ui->logButtonsLayout->insertWidget(0, m_logFilterEdit);
+    ui->logButtonsLayout->insertWidget(1, m_logProblemsCheck);
+    connect(m_logFilterEdit, &QLineEdit::textChanged, this, &MainWindow::applyLogFilter);
+    connect(m_logProblemsCheck, &QCheckBox::toggled, this, &MainWindow::applyLogFilter);
+
     m_tuneMoeButton = new QToolButton(this);
     m_tuneMoeButton->setText(tr("Find Fastest..."));
     m_tuneMoeButton->setToolTip(tr("Benchmark with llama-bench which number of expert layers on the CPU gives the fastest generation"));
@@ -244,7 +255,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_killTimer->setInterval(kKillTimeoutMs);
     connect(m_killTimer, &QTimer::timeout, this, [this] {
         if (m_server->isRunning()) {
-            ui->consoleOutput->appendPlainText(tr("Server did not stop in time, killing it."));
+            appendLog(tr("Server did not stop in time, killing it."));
             m_server->kill();
         }
     });
@@ -448,7 +459,7 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
             const WhenIdle what = m_whenIdle;
             m_whenIdle = IdleNothing;
             m_idleSamples = 0;
-            ui->consoleOutput->appendPlainText(tr("The server is idle now."));
+            appendLog(tr("The server is idle now."));
             if (what == IdleRestart)
                 restartServer();
             else
@@ -542,6 +553,8 @@ void MainWindow::setupCornerControls()
     m_restartIdleAction->setCheckable(true);
     m_stopIdleAction = menu->addAction(tr("Stop Server When Idle"), this, [this] { setWhenIdle(IdleStop); });
     m_stopIdleAction->setCheckable(true);
+    menu->addSeparator();
+    menu->addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), tr("Copy Command Line"), this, &MainWindow::copyCommandLine);
     menu->addSeparator();
     menu->addAction(QIcon::fromTheme(QStringLiteral("system-reboot")), tr("Restart Launcher (Server Keeps Running)"),
                     this, &MainWindow::restartLauncher);
@@ -1397,7 +1410,7 @@ void MainWindow::startServer()
     const QFileInfo exeInfo(exe.contains(QLatin1Char('/')) ? exe : QStandardPaths::findExecutable(exe));
     if (!exeInfo.isFile() || !exeInfo.isExecutable()) {
         const QString msg = tr("Could not start %1: %2").arg(exe, processErrorText(QProcess::FailedToStart));
-        ui->consoleOutput->appendPlainText(msg);
+        appendLog(msg);
         ui->tabWidget->setCurrentWidget(ui->logTab);
         notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
         return;
@@ -1423,19 +1436,19 @@ void MainWindow::startServer()
     if (!info.apiKey.isEmpty())
         env.insert(QStringLiteral("LLAMA_API_KEY"), info.apiKey);
 
-    ui->consoleOutput->clear();
+    clearLog();
     m_logAdvisor.reset();
     m_appliedFixes.clear();
     m_restartPending = false;
     updateLogAdvice();
     if (!tlsNote.isEmpty())
-        ui->consoleOutput->appendPlainText(tlsNote);
-    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(info.exe, joinCommand(info.args)));
+        appendLog(tlsNote);
+    appendLog(tr("Starting %1 %2").arg(info.exe, joinCommand(info.args)));
 
     QString error;
     if (!m_server->start(info, env, &error)) {
         const QString msg = tr("Could not start %1: %2").arg(info.exe, error);
-        ui->consoleOutput->appendPlainText(msg);
+        appendLog(msg);
         ui->tabWidget->setCurrentWidget(ui->logTab);
         notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
         return;
@@ -1449,16 +1462,16 @@ bool MainWindow::adoptRunningServer()
     if (!m_server->adopt(&output))
         return false;
 
-    ui->consoleOutput->clear();
+    clearLog();
     m_logAdvisor.reset();
     m_appliedFixes.clear();
     for (const QString &line : std::as_const(output)) {
-        ui->consoleOutput->appendPlainText(line);
+        appendLog(line);
         m_lastOutputLine = line;
         m_logAdvisor.feedLine(line);
     }
     const ServerProcess::Info &info = m_server->info();
-    ui->consoleOutput->appendPlainText(
+    appendLog(
         tr("Picked up the server that was already running (started %1).")
             .arg(QLocale().toString(info.startedAt, QLocale::ShortFormat)));
     updateLogAdvice();
@@ -1487,7 +1500,7 @@ void MainWindow::stopServer()
 {
     if (!m_server->isRunning())
         return;
-    ui->consoleOutput->appendPlainText(tr("Stopping server..."));
+    appendLog(tr("Stopping server..."));
     m_stopRequested = true;
     m_server->terminate();
     m_killTimer->start();
@@ -1496,7 +1509,7 @@ void MainWindow::stopServer()
 void MainWindow::handleServerOutput(const QStringList &lines)
 {
     for (const QString &trimmed : lines) {
-        ui->consoleOutput->appendPlainText(trimmed);
+        appendLog(trimmed);
         m_lastOutputLine = trimmed;
         m_monitor->feedLogLine(trimmed);
         if (m_logAdvisor.feedLine(trimmed)) {
@@ -1584,6 +1597,63 @@ void MainWindow::onLogAdviceLinkActivated(const QString &link)
     }
 }
 
+void MainWindow::appendLog(const QString &line)
+{
+    m_logLines << line;
+    if (m_logLines.size() > kMaxConsoleLines)
+        m_logLines.remove(0, m_logLines.size() - kMaxConsoleLines);
+    if (logLineVisible(line))
+        ui->consoleOutput->appendPlainText(line);
+}
+
+void MainWindow::clearLog()
+{
+    m_logLines.clear();
+    ui->consoleOutput->clear();
+}
+
+bool MainWindow::logLineVisible(const QString &line) const
+{
+    static const QRegularExpression problems(
+        QStringLiteral("\\b(warn(ing)?|error|err|fail(ed|ure|s)?|fatal|abort(ed)?|unable|cannot|can't|not supported|"
+                       "out of memory|oom|crash(ed)?|exception)\\b"),
+        QRegularExpression::CaseInsensitiveOption);
+    if (m_logProblemsCheck && m_logProblemsCheck->isChecked() && !problems.match(line).hasMatch())
+        return false;
+    const QString filter = m_logFilterEdit ? m_logFilterEdit->text().trimmed() : QString();
+    return filter.isEmpty() || line.contains(filter, Qt::CaseInsensitive);
+}
+
+void MainWindow::applyLogFilter()
+{
+    QStringList shown;
+    for (const QString &line : std::as_const(m_logLines)) {
+        if (logLineVisible(line))
+            shown << line;
+    }
+    ui->consoleOutput->setPlainText(shown.join(QLatin1Char('\n')));
+    ui->consoleOutput->moveCursor(QTextCursor::End);
+    ui->consoleOutput->ensureCursorVisible();
+}
+
+void MainWindow::copyCommandLine()
+{
+    // What the running server was started with, otherwise what Start would run now.
+    // The API key is passed in the environment and deliberately left out.
+    QString exe;
+    QStringList args;
+    if (m_server->isRunning()) {
+        exe = m_server->info().exe;
+        args = m_server->info().args;
+    } else {
+        exe = serverExecutable();
+        args = buildArguments();
+    }
+    QGuiApplication::clipboard()->setText(joinCommand(QStringList{exe} + args));
+    statusBar()->showMessage(m_server->isRunning() ? tr("Copied the command line of the running server")
+                                                   : tr("Copied the command line Start would run"), 4000);
+}
+
 void MainWindow::on_copyLogButton_clicked()
 {
     QApplication::clipboard()->setText(ui->consoleOutput->toPlainText());
@@ -1592,7 +1662,7 @@ void MainWindow::on_copyLogButton_clicked()
 
 void MainWindow::on_clearLogButton_clicked()
 {
-    ui->consoleOutput->clear();
+    clearLog();
 }
 
 void MainWindow::handleServerFinished(int exitCode, int crashSignal)
@@ -1608,7 +1678,7 @@ void MainWindow::handleServerFinished(int exitCode, int crashSignal)
         result = tr("Server stopped (exit code %1).").arg(exitCode);
     else
         result = tr("Server stopped.");
-    ui->consoleOutput->appendPlainText(result);
+    appendLog(result);
 
     const bool unexpected = !m_stopRequested && (crashSignal != 0 || exitCode != 0);
     setStatus(Status::Stopped);

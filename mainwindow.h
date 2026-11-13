@@ -16,7 +16,9 @@
 #include <QNetworkReply>
 #include <QTimer>
 #include <QToolButton>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QLineEdit>
 #include <QUrl>
 #include <functional>
 
@@ -74,6 +76,11 @@ private slots:
     void setupCornerControls();
     void setupSamplingPresets();
     void tuneMoe();              // llama-bench over --n-cpu-moe values
+    void appendLog(const QString &line);
+    void clearLog();
+    void applyLogFilter();       // shows the lines that match the Log tab filter
+    bool logLineVisible(const QString &line) const;
+    void copyCommandLine();
     void updatePresetCombo();    // selects the preset the sampling values match, if any
     void applySamplingPreset(int index);
     void saveSamplingPreset();
@@ -106,6 +113,9 @@ private:
     QTimer *m_pendingTimer = nullptr;
     QComboBox *m_presetCombo = nullptr;
     QToolButton *m_tuneMoeButton = nullptr;
+    QStringList m_logLines;      // the whole log; the view may show only the lines matching the filter
+    QLineEdit *m_logFilterEdit = nullptr;
+    QCheckBox *m_logProblemsCheck = nullptr;
     QToolButton *m_deletePresetButton = nullptr;
     QAction *m_stopIdleAction = nullptr;
     enum WhenIdle { IdleNothing, IdleRestart, IdleStop };
