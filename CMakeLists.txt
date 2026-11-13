@@ -22,6 +22,8 @@ qt_add_executable(Llama-launcher
     monitor.h
     tlscert.cpp
     tlscert.h
+    serverprocess.cpp
+    serverprocess.h
     resources.qrc
 )
 

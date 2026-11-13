@@ -30,9 +30,9 @@ Key Features
         Device selector: lists the devices reported by llama-server --list-devices and passes the choice as --device. Useful on machines with an integrated + discrete GPU, where offloading to both is usually slower than using the discrete card alone. "CPU only" passes --device none.
     Deep KDE Plasma Integration:
         System Tray Support: Runs quietly in the background with a dedicated tray icon.
-        Minimize to Tray: Closing the main window hides the application to the tray instead of terminating the server. To quit, use Quit in the menu (Ctrl+Q) or Exit in the tray menu; if the server is running, the launcher asks before stopping it.
+        Minimize to Tray: Closing the main window hides the application to the tray instead of terminating the server. To quit, use Quit in the menu (Ctrl+Q) or Exit in the tray menu; if the server is running, you choose whether to stop it or keep it running.
         Single instance: starting the launcher again (e.g. from the application menu) brings up the window of the one already running instead of starting a second server.
-        The server never outlives the launcher: logging out or a kill signal stops it cleanly, and if the launcher is killed outright or crashes, the kernel stops the server too, so it does not keep the port, RAM and VRAM.
+        The server runs independently of the launcher: you can quit, restart or upgrade the launcher (menu → Restart Launcher) while the server keeps serving requests, and the next launcher picks it up again, with its log, status and monitoring. The server output is kept in ~/.local/state/llama-launcher/server.log. Logging out or a kill signal to the launcher still stops the server cleanly.
         Dynamic Tooltips: Hover over the tray icon to see real-time server status, the loaded model and its URL.
         Quick Access Menu: Start/Stop the server, open it in the browser or exit from the right-click context menu.
         Notifications when the server is ready, fails to start or stops unexpectedly (can be turned off).

@@ -32,11 +32,7 @@
 #include <cmath>
 #include <limits>
 
-#ifdef Q_OS_LINUX
-#include <csignal>
-#include <sys/prctl.h>
 #include <unistd.h>
-#endif
 
 namespace {
 
@@ -119,7 +115,7 @@ QString processErrorText(QProcess::ProcessError error)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_process(new QProcess(this))
+    , m_server(new ServerProcess(this))
     , m_networkManager(new QNetworkAccessManager(this))
     , m_healthTimer(new QTimer(this))
     , m_killTimer(new QTimer(this))
@@ -176,23 +172,12 @@ MainWindow::MainWindow(QWidget *parent)
     }
     ui->networkHintLabel->setOpenExternalLinks(true);
 
-    // Server output: stdout and stderr interleaved in the order they were written.
-    m_process->setProcessChannelMode(QProcess::MergedChannels);
-#ifdef Q_OS_LINUX
-    // If the launcher dies without stopping the server (killed, crashed), the kernel sends the
-    // server SIGTERM, so it does not stay behind holding the port, RAM and VRAM. The signal is
-    // tied to the thread that started the process; the server is always started from the GUI thread.
-    const pid_t launcherPid = ::getpid();
-    m_process->setChildProcessModifier([launcherPid] {
-        ::prctl(PR_SET_PDEATHSIG, SIGTERM);
-        if (::getppid() != launcherPid) // the launcher was already gone before prctl()
-            ::_exit(1);
-    });
-#endif
-    connect(m_process, &QProcess::readyReadStandardOutput, this, &MainWindow::readProcessOutput);
-    connect(m_process, &QProcess::started, this, &MainWindow::handleProcessStarted);
-    connect(m_process, &QProcess::errorOccurred, this, &MainWindow::handleProcessError);
-    connect(m_process, &QProcess::finished, this, &MainWindow::handleProcessFinished);
+    // The server runs on its own (see ServerProcess): the launcher can be restarted or upgraded
+    // while it serves requests, and picks it up again when it starts.
+    m_launcherPath = QCoreApplication::applicationFilePath();
+    connect(m_server, &ServerProcess::outputLines, this, &MainWindow::handleServerOutput);
+    connect(m_server, &ServerProcess::serverPidKnown, m_monitor, &Monitor::setProcessId);
+    connect(m_server, &ServerProcess::finished, this, &MainWindow::handleServerFinished);
 
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
     setupCharts();
@@ -202,9 +187,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_killTimer->setSingleShot(true);
     m_killTimer->setInterval(kKillTimeoutMs);
     connect(m_killTimer, &QTimer::timeout, this, [this] {
-        if (m_process->state() != QProcess::NotRunning) {
+        if (m_server->isRunning()) {
             ui->consoleOutput->appendPlainText(tr("Server did not stop in time, killing it."));
-            m_process->kill();
+            m_server->kill();
         }
     });
 
@@ -213,27 +198,25 @@ MainWindow::MainWindow(QWidget *parent)
     setStatus(Status::Stopped);
     refreshServerInfo();
 
-    if (ui->autoStartServerCheck->isChecked())
-        QTimer::singleShot(0, this, &MainWindow::startServer);
+    if (!adoptRunningServer() && ui->autoStartServerCheck->isChecked()) {
+        QTimer::singleShot(0, this, [this] {
+            if (!m_serverAutostartCancelled)
+                startServer();
+        });
+    }
 }
 
 MainWindow::~MainWindow()
 {
     saveSettings();
 
-    // Child processes (the server and any --version/--list-devices probes) emit finished()
-    // when they are destroyed; make sure none of that reaches handlers that use `ui`.
+    // Probe processes (--version/--list-devices) emit finished() when they are destroyed;
+    // make sure none of that reaches handlers that use `ui`. The server itself is left alone:
+    // quitApplication() stops it, otherwise the next launcher adopts it.
     const auto processes = findChildren<QProcess *>();
     for (QProcess *process : processes)
         process->disconnect(this);
-
-    if (m_process->state() != QProcess::NotRunning) {
-        m_process->terminate();
-        if (!m_process->waitForFinished(3000)) {
-            m_process->kill();
-            m_process->waitForFinished();
-        }
-    }
+    m_server->disconnect(this);
     delete ui;
 }
 
@@ -243,6 +226,10 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    if (m_quitting) {
+        event->accept();
+        return;
+    }
     if (hasTray()) {
         saveSettings();
         hide();
@@ -324,7 +311,7 @@ void MainWindow::setupCharts()
 void MainWindow::updateMonitorActivity()
 {
     // In the tray with the server stopped there is nothing to show or record.
-    const bool wanted = isVisible() || m_process->state() != QProcess::NotRunning;
+    const bool wanted = isVisible() || m_server->isRunning();
     if (wanted && !m_monitor->isActive())
         m_monitor->start();
     else if (!wanted && m_monitor->isActive())
@@ -379,7 +366,7 @@ void MainWindow::onMonitorSample(const MonitorSample &s)
     }
 
     // llama-server
-    const bool running = m_process->state() != QProcess::NotRunning;
+    const bool running = m_server->isRunning();
     ui->tpsChart->setData({gen});
     QStringList last;
     if (s.lastGenTps >= 0)
@@ -474,6 +461,8 @@ void MainWindow::setupCornerControls()
     m_menuRestartAction = menu->addAction(QIcon::fromTheme(QStringLiteral("view-refresh")), tr("Restart Server"),
                                           this, &MainWindow::restartServer);
     menu->addSeparator();
+    menu->addAction(QIcon::fromTheme(QStringLiteral("system-reboot")), tr("Restart Launcher (Server Keeps Running)"),
+                    this, &MainWindow::restartLauncher);
     QAction *quit = menu->addAction(QIcon::fromTheme(QStringLiteral("application-exit")), tr("Quit"),
                                     this, &MainWindow::requestQuit);
     quit->setShortcut(QKeySequence::Quit);
@@ -499,29 +488,58 @@ void MainWindow::setupCornerControls()
 
 void MainWindow::requestQuit()
 {
-    if (m_process->state() != QProcess::NotRunning) {
-        if (isHidden())
-            bringToFront(); // the question must not pop up out of nowhere over other windows
-        const auto answer = QMessageBox::question(this, tr("Quit Llama Launcher"),
-                                                  tr("The server is running. Quit and stop it?"),
-                                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (answer != QMessageBox::Yes)
-            return;
+    if (!m_server->isRunning()) {
+        quitApplication();
+        return;
     }
-    quitApplication();
+    if (isHidden())
+        bringToFront(); // the question must not pop up out of nowhere over other windows
+
+    QMessageBox box(QMessageBox::Question, tr("Quit Llama Launcher"), tr("The server is running."),
+                    QMessageBox::NoButton, this);
+    box.setInformativeText(tr("Stop it, or keep it running: the launcher picks it up again the next time it starts."));
+    QPushButton *keep = box.addButton(tr("Keep Server Running"), QMessageBox::AcceptRole);
+    QPushButton *stop = box.addButton(tr("Stop Server and Quit"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(keep);
+    box.exec();
+    if (box.clickedButton() == keep)
+        quitKeepingServer();
+    else if (box.clickedButton() == stop)
+        quitApplication();
 }
 
 void MainWindow::quitApplication()
 {
+    m_quitting = true;
     saveSettings();
-    if (m_process->state() != QProcess::NotRunning) {
+    if (m_server->isRunning()) {
         m_stopRequested = true;
-        m_process->terminate();
-        if (!m_process->waitForFinished(3000)) {
-            m_process->kill();
-            m_process->waitForFinished();
-        }
+        m_server->stopAndWait(3000);
     }
+    qApp->quit();
+}
+
+void MainWindow::quitKeepingServer()
+{
+    m_quitting = true;
+    saveSettings();
+    qApp->quit();
+}
+
+void MainWindow::restartLauncher()
+{
+    saveSettings();
+    QString path = m_launcherPath;
+    path.remove(QStringLiteral(" (deleted)")); // replaced by a new build since it was started
+    QStringList args{QStringLiteral("--replace"), QString::number(QCoreApplication::applicationPid())};
+    if (isHidden())
+        args << QStringLiteral("--autostart"); // stay in the tray, as now
+    if (!QProcess::startDetached(path, args)) {
+        QMessageBox::warning(this, tr("Warning"), tr("Could not start %1.").arg(path));
+        return;
+    }
+    m_quitting = true;
     qApp->quit();
 }
 
@@ -579,7 +597,7 @@ void MainWindow::setStatus(Status status)
 {
     const Status previous = m_status;
     m_status = status;
-    const bool running = m_process->state() != QProcess::NotRunning;
+    const bool running = m_server->isRunning();
 
     QString text, color;
     switch (status) {
@@ -605,7 +623,7 @@ void MainWindow::setStatus(Status status)
 
     const bool ready = status == Status::Running;
     if (ready && previous != Status::Running)
-        m_monitor->setServer(serverUrl(), ui->apiKeyEdit->text().trimmed(), m_runningHttps ? m_runningCert : QSslCertificate());
+        m_monitor->setServer(serverUrl(), m_server->info().apiKey, m_runningHttps ? m_runningCert : QSslCertificate());
     else if (status == Status::Stopped) {
         m_monitor->setServer(QUrl(), QString());
         m_monitor->setProcessId(0);
@@ -814,7 +832,7 @@ void MainWindow::on_keyBrowseButton_clicked()
 
 void MainWindow::toggleServer()
 {
-    if (m_process->state() != QProcess::NotRunning) {
+    if (m_server->isRunning()) {
         m_restartPending = false; // an explicit Stop wins over a restart requested from a hint
         stopServer();
     } else {
@@ -937,7 +955,7 @@ QStringList MainWindow::buildArguments() const
 
 void MainWindow::startServer()
 {
-    if (m_process->state() != QProcess::NotRunning)
+    if (m_server->isRunning())
         return;
 
     const QString modelPath = ui->modelCombo->currentData().toString();
@@ -970,28 +988,34 @@ void MainWindow::startServer()
         }
     }
 
+    const QString exe = serverExecutable();
+    const QFileInfo exeInfo(exe.contains(QLatin1Char('/')) ? exe : QStandardPaths::findExecutable(exe));
+    if (!exeInfo.isFile() || !exeInfo.isExecutable()) {
+        const QString msg = tr("Could not start %1: %2").arg(exe, processErrorText(QProcess::FailedToStart));
+        ui->consoleOutput->appendPlainText(msg);
+        ui->tabWidget->setCurrentWidget(ui->logTab);
+        notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
+        return;
+    }
+
     saveSettings(); // persist what is about to be used, even if the session ends abruptly
     addRecentModel(modelPath);
 
-    const QStringList arguments = buildArguments();
-    const QString exe = serverExecutable();
-
-    m_stopRequested = false;
-    m_outputBuffer.clear();
-    m_lastOutputLine.clear();
-    m_runningModelName = QFileInfo(modelPath).fileName();
-    m_runningPort = ui->portSpin->value();
-    m_runningWebUi = !ui->noUiCheck->isChecked();
-    m_runningLan = ui->lanAccessCheck->isChecked();
-    m_runningHttps = httpsEnabled();
-    m_runningCert = m_runningHttps ? TlsCert::firstCertificate(tlsCertFile()) : QSslCertificate();
+    ServerProcess::Info info;
+    info.exe = exeInfo.absoluteFilePath();
+    info.args = buildArguments();
+    info.apiKey = ui->apiKeyEdit->text().trimmed();
+    info.modelName = QFileInfo(modelPath).fileName();
+    info.port = ui->portSpin->value();
+    info.webUi = !ui->noUiCheck->isChecked();
+    info.lan = ui->lanAccessCheck->isChecked();
+    info.https = httpsEnabled();
+    info.certFile = info.https ? tlsCertFile() : QString();
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.remove(QStringLiteral("LLAMA_API_KEY"));
-    const QString apiKey = ui->apiKeyEdit->text().trimmed();
-    if (!apiKey.isEmpty())
-        env.insert(QStringLiteral("LLAMA_API_KEY"), apiKey);
-    m_process->setProcessEnvironment(env);
+    if (!info.apiKey.isEmpty())
+        env.insert(QStringLiteral("LLAMA_API_KEY"), info.apiKey);
 
     ui->consoleOutput->clear();
     m_logAdvisor.reset();
@@ -1000,45 +1024,72 @@ void MainWindow::startServer()
     updateLogAdvice();
     if (!tlsNote.isEmpty())
         ui->consoleOutput->appendPlainText(tlsNote);
-    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, joinCommand(arguments)));
-    setStatus(Status::Starting);
-    m_process->start(exe, arguments); // asynchronous: started() / errorOccurred() follow
+    ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(info.exe, joinCommand(info.args)));
+
+    QString error;
+    if (!m_server->start(info, env, &error)) {
+        const QString msg = tr("Could not start %1: %2").arg(info.exe, error);
+        ui->consoleOutput->appendPlainText(msg);
+        ui->tabWidget->setCurrentWidget(ui->logTab);
+        notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
+        return;
+    }
+    serverStarted();
 }
 
-void MainWindow::handleProcessStarted()
+bool MainWindow::adoptRunningServer()
 {
+    QStringList output;
+    if (!m_server->adopt(&output))
+        return false;
+
+    ui->consoleOutput->clear();
+    m_logAdvisor.reset();
+    m_appliedFixes.clear();
+    for (const QString &line : std::as_const(output)) {
+        ui->consoleOutput->appendPlainText(line);
+        m_lastOutputLine = line;
+        m_logAdvisor.feedLine(line);
+    }
+    const ServerProcess::Info &info = m_server->info();
+    ui->consoleOutput->appendPlainText(
+        tr("Picked up the server that was already running (started %1).")
+            .arg(QLocale().toString(info.startedAt, QLocale::ShortFormat)));
+    updateLogAdvice();
+    serverStarted();
+    if (m_server->serverPid() > 0)
+        m_monitor->setProcessId(m_server->serverPid());
+    return true;
+}
+
+void MainWindow::serverStarted()
+{
+    const ServerProcess::Info &info = m_server->info();
+    m_stopRequested = false;
+    m_runningModelName = info.modelName;
+    m_runningPort = info.port;
+    m_runningWebUi = info.webUi;
+    m_runningLan = info.lan;
+    m_runningHttps = info.https;
+    m_runningCert = info.https ? TlsCert::firstCertificate(info.certFile) : QSslCertificate();
     m_monitor->resetServerStats();
-    m_monitor->setProcessId(m_process->processId());
     setStatus(Status::Loading);
     m_healthTimer->start();
 }
 
 void MainWindow::stopServer()
 {
-    if (m_process->state() == QProcess::NotRunning)
+    if (!m_server->isRunning())
         return;
     ui->consoleOutput->appendPlainText(tr("Stopping server..."));
     m_stopRequested = true;
-    m_process->terminate();
+    m_server->terminate();
     m_killTimer->start();
 }
 
-void MainWindow::readProcessOutput()
+void MainWindow::handleServerOutput(const QStringList &lines)
 {
-    m_outputBuffer += m_process->readAllStandardOutput();
-
-    // Only print complete lines so chunk boundaries do not split them.
-    const int lastNewline = m_outputBuffer.lastIndexOf('\n');
-    if (lastNewline < 0)
-        return;
-    const QString text = QString::fromUtf8(m_outputBuffer.left(lastNewline));
-    m_outputBuffer.remove(0, lastNewline + 1);
-
-    const QStringList lines = text.split(QLatin1Char('\n'));
-    for (const QString &line : lines) {
-        const QString trimmed = line.trimmed();
-        if (trimmed.isEmpty())
-            continue;
+    for (const QString &trimmed : lines) {
         ui->consoleOutput->appendPlainText(trimmed);
         m_lastOutputLine = trimmed;
         m_monitor->feedLogLine(trimmed);
@@ -1071,7 +1122,7 @@ void MainWindow::updateLogAdvice()
     }
     html += QStringLiteral("</ul>");
     if (!m_appliedFixes.isEmpty() && !m_restartPending) {
-        const bool running = m_process->state() != QProcess::NotRunning;
+        const bool running = m_server->isRunning();
         html += QStringLiteral("<a href='restart'>%1</a>")
                     .arg((running ? tr("Restart the server") : tr("Start the server")).toHtmlEscaped());
     }
@@ -1109,7 +1160,7 @@ void MainWindow::applyHintFix(LogAdvisor::HintId id)
 
 void MainWindow::restartServer()
 {
-    if (m_process->state() == QProcess::NotRunning) {
+    if (!m_server->isRunning()) {
         startServer();
     } else {
         m_restartPending = true; // handleProcessFinished() starts it again
@@ -1138,43 +1189,27 @@ void MainWindow::on_clearLogButton_clicked()
     ui->consoleOutput->clear();
 }
 
-void MainWindow::handleProcessError(QProcess::ProcessError error)
-{
-    // Crashed is followed by finished(), which reports it; only FailedToStart ends here.
-    if (error != QProcess::FailedToStart) {
-        if (!(error == QProcess::Crashed && m_stopRequested))
-            ui->consoleOutput->appendPlainText(tr("Process error: %1").arg(processErrorText(error)));
-        return;
-    }
-
-    const QString msg = tr("Could not start %1: %2").arg(serverExecutable(), processErrorText(error));
-    ui->consoleOutput->appendPlainText(msg);
-    ui->tabWidget->setCurrentWidget(ui->logTab);
-    m_healthTimer->stop();
-    setStatus(Status::Stopped);
-    notify(tr("Llama server failed to start"), msg, QSystemTrayIcon::Critical);
-}
-
-void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
+void MainWindow::handleServerFinished(int exitCode, int crashSignal)
 {
     m_killTimer->stop();
     m_healthTimer->stop();
-    if (!m_outputBuffer.isEmpty()) {
-        ui->consoleOutput->appendPlainText(QString::fromUtf8(m_outputBuffer).trimmed());
-        m_outputBuffer.clear();
-    }
 
-    const bool unexpected = !m_stopRequested && (exitStatus == QProcess::CrashExit || exitCode != 0);
-    if (exitStatus == QProcess::CrashExit && !m_stopRequested)
-        ui->consoleOutput->appendPlainText(tr("Server crashed."));
+    QString result;
+    if (crashSignal != 0)
+        result = m_stopRequested ? tr("Server stopped (signal %1).").arg(crashSignal)
+                                 : tr("Server crashed (signal %1).").arg(crashSignal);
+    else if (exitCode >= 0)
+        result = tr("Server stopped (exit code %1).").arg(exitCode);
     else
-        ui->consoleOutput->appendPlainText(tr("Server stopped (exit code %1).").arg(exitCode));
+        result = tr("Server stopped.");
+    ui->consoleOutput->appendPlainText(result);
 
+    const bool unexpected = !m_stopRequested && (crashSignal != 0 || exitCode != 0);
     setStatus(Status::Stopped);
 
     if (unexpected) {
         ui->tabWidget->setCurrentWidget(ui->logTab); // the reason is in the server output
-        QString msg = tr("Server stopped unexpectedly (exit code %1).").arg(exitCode);
+        QString msg = exitCode > 0 ? tr("Server stopped unexpectedly (exit code %1).").arg(exitCode) : result;
         if (!m_lastOutputLine.isEmpty())
             msg += QLatin1Char('\n') + m_lastOutputLine.right(200);
         notify(tr("Llama server stopped"), msg, QSystemTrayIcon::Warning);
@@ -1182,7 +1217,7 @@ void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitSt
 
     if (m_restartPending) {
         m_restartPending = false;
-        QTimer::singleShot(0, this, &MainWindow::startServer); // after QProcess has finished its own handling
+        QTimer::singleShot(0, this, &MainWindow::startServer);
     } else {
         updateLogAdvice(); // "Restart the server" becomes "Start the server"
     }
@@ -1190,7 +1225,7 @@ void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus exitSt
 
 void MainWindow::checkServerHealth()
 {
-    if (m_process->state() == QProcess::NotRunning) {
+    if (!m_server->isRunning()) {
         m_healthTimer->stop();
         return;
     }
@@ -1202,7 +1237,7 @@ void MainWindow::checkServerHealth()
 
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
-        if (m_process->state() == QProcess::NotRunning)
+        if (!m_server->isRunning())
             return;
         const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->error() == QNetworkReply::NoError && statusCode == 200)
@@ -1524,7 +1559,7 @@ void MainWindow::updateFitWarning()
 
 void MainWindow::updateUiState()
 {
-    const bool running = m_process->state() != QProcess::NotRunning;
+    const bool running = m_server->isRunning();
 
     ui->gpuLayersSpin->setDisabled(ui->gpuAutoCheck->isChecked());
     ui->contextSizeCombo->setDisabled(ui->contextAutoCheck->isChecked());

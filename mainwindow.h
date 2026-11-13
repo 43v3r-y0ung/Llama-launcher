@@ -4,6 +4,7 @@
 #include "gguf.h"
 #include "logadvisor.h"
 #include "monitor.h"
+#include "serverprocess.h"
 
 #include <QMainWindow>
 #include <QProcess>
@@ -31,12 +32,15 @@ public:
     ~MainWindow() override;
 
     bool hasTray() const { return m_trayIcon && m_trayIcon->isVisible(); }
+    void cancelServerAutostart() { m_serverAutostartCancelled = true; } // after a launcher restart
 
 public slots:
     void startServer();
     void stopServer();
     void bringToFront();    // show and raise the window, e.g. when the launcher is started again
     void quitApplication(); // stops the server and saves settings before quitting
+    void quitKeepingServer(); // saves settings and quits; the next launcher adopts the server
+    void restartLauncher();   // runs the launcher binary again (a newer one, if installed); the server keeps running
 
 private slots:
     void on_browseButton_clicked();
@@ -52,10 +56,8 @@ private slots:
     void on_copyLogButton_clicked();
     void on_clearLogButton_clicked();
     void updateNetworkHint();
-    void readProcessOutput();
-    void handleProcessStarted();
-    void handleProcessError(QProcess::ProcessError error);
-    void handleProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void handleServerOutput(const QStringList &lines);
+    void handleServerFinished(int exitCode, int crashSignal);
     void onModelChanged(int index);
     void onLaunchAtLoginToggled(bool enabled);
     void saveSettings();
@@ -78,7 +80,10 @@ private:
     enum class Status { Stopped, Starting, Loading, Running };
 
     Ui::MainWindow *ui;
-    QProcess *m_process;
+    ServerProcess *m_server;
+    QString m_launcherPath;      // the launcher binary as started, for restarting it
+    bool m_serverAutostartCancelled = false;
+    bool m_quitting = false;     // Qt 6 closes the windows on quit(); closeEvent() must let that through
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
     QAction *m_startAction = nullptr;
@@ -101,7 +106,6 @@ private:
     bool m_runningHttps = false;
     QSslCertificate m_runningCert;  // what the HTTPS server presents; the launcher trusts only this
     bool m_stopRequested = false; // distinguishes a user stop from a crash
-    QByteArray m_outputBuffer;    // incomplete trailing line of server output
     QString m_lastOutputLine;
     LogAdvisor m_logAdvisor;     // hints from known server warnings, shown on the Log tab
     QList<LogAdvisor::HintId> m_appliedFixes; // hints whose fix was applied during this run
@@ -116,6 +120,8 @@ private:
     bool m_loading = false;      // suppresses change handlers while settings are applied
 
     void setupSystemTray();
+    bool adoptRunningServer();   // picks up a server left running by a previous launcher
+    void serverStarted();        // common to starting and adopting
     void setupCharts();
     void onMonitorSample(const MonitorSample &sample);
     void updateMonitorActivity(); // sample only while someone can see it or the server runs

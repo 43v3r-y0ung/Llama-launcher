@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "serverprocess.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -9,6 +10,7 @@
 #include <QLocale>
 #include <QSocketNotifier>
 #include <QStandardPaths>
+#include <QThread>
 #include <QTranslator>
 
 #include <csignal>
@@ -72,8 +74,20 @@ bool activateRunningInstance(const QString &socketName, bool showWindow)
 
 } // namespace
 
+// When the launcher restarts itself, the new instance waits for the old one to exit and release the
+// single-instance socket; otherwise it would only ask the old one to show its window.
+void waitForProcessExit(qint64 pid, int timeoutMs)
+{
+    for (int waited = 0; pid > 0 && ::kill(pid_t(pid), 0) == 0 && waited < timeoutMs; waited += 50)
+        QThread::msleep(50);
+}
+
 int main(int argc, char *argv[])
 {
+    // A copy of the launcher that keeps llama-server company; see ServerProcess.
+    if (ServerProcess::isSupervisorInvocation(argc, argv))
+        return ServerProcess::runSupervisor(argc, argv);
+
     QApplication a(argc, argv);
     QApplication::setOrganizationName(QStringLiteral("LlamaLauncher"));
     QApplication::setApplicationName(QStringLiteral("LlamaLauncher"));
@@ -97,7 +111,14 @@ int main(int argc, char *argv[])
     QCommandLineOption autostartOption(QStringLiteral("autostart"),
                                        QApplication::translate("main", "Start hidden in the system tray (used at login)."));
     parser.addOption(autostartOption);
+    QCommandLineOption replaceOption(QStringLiteral("replace"),
+                                     QApplication::translate("main", "Wait for the launcher with this process ID to exit first."),
+                                     QStringLiteral("pid"));
+    replaceOption.setFlags(QCommandLineOption::HiddenFromHelp);
+    parser.addOption(replaceOption);
     parser.process(a);
+    if (parser.isSet(replaceOption))
+        waitForProcessExit(parser.value(replaceOption).toLongLong(), 15000);
 
     // A second launcher would start a second server on the same port; bring up the first one instead.
     // At login (--autostart) there is nothing to show, the running launcher is left alone.
@@ -106,6 +127,8 @@ int main(int argc, char *argv[])
         return 0;
 
     MainWindow w;
+    if (parser.isSet(replaceOption))
+        w.cancelServerAutostart(); // a restarted launcher keeps the server as it was
     installQuitSignalHandlers(&w);
 
     QLocalServer instanceServer;
