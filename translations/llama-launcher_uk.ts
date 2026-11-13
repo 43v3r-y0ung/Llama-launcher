@@ -28,6 +28,29 @@
     </message>
 </context>
 <context>
+    <name>LogAdvisor</name>
+    <message>
+        <source>Automatic fitting was skipped because the number of GPU layers is set manually, so the context size was not reduced to fit into memory. Set GPU layers to Auto, or choose the context size yourself.</source>
+        <translation>Автоматичне підлаштування пропущено, бо кількість шарів на GPU задано вручну, тому розмір контексту не зменшено під доступну пам'ять. Увімкніть «Авто» для шарів GPU або задайте розмір контексту самостійно.</translation>
+    </message>
+    <message>
+        <source>Flash Attention is not supported on this device for this configuration and was turned off, so the Flash Attention setting has no effect.</source>
+        <translation>Flash Attention не підтримується цим пристроєм для такої конфігурації й був вимкнений, тож налаштування Flash Attention не діє.</translation>
+    </message>
+    <message>
+        <source>This model does not support Context Shift, so that option has no effect and can be turned off.</source>
+        <translation>Ця модель не підтримує Context Shift, тож ця опція не діє і її можна вимкнути.</translation>
+    </message>
+    <message>
+        <source>Part of the model (for example MoE experts) is kept on the CPU while the file is memory-mapped. Loading the model fully (Advanced tab, --no-mmap) may be faster.</source>
+        <translation>Частина моделі (наприклад, MoE-експерти) лишається на CPU, а файл відображено в пам'ять (mmap). Повне завантаження моделі (вкладка «Додатково», --no-mmap) може бути швидшим.</translation>
+    </message>
+    <message>
+        <source>Not enough memory for the requested settings. Lower the context size or the number of GPU layers, use a quantized KV cache, or keep MoE experts on the CPU.</source>
+        <translation>Недостатньо пам'яті для вибраних налаштувань. Зменште розмір контексту або кількість шарів на GPU, використайте квантований KV-кеш або залиште MoE-експертів на CPU.</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../mainwindow.ui" line="14"/>
@@ -1118,6 +1141,18 @@ Model: %1
             <numerusform>Перенесено %n опцію з додаткових аргументів на вкладку «Додатково»</numerusform>
             <numerusform>Перенесено %n опції з додаткових аргументів на вкладку «Додатково»</numerusform>
             <numerusform>Перенесено %n опцій з додаткових аргументів на вкладку «Додатково»</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Hints from the server log:</source>
+        <translation>Підказки з журналу сервера:</translation>
+    </message>
+    <message numerus="yes">
+        <source>The server log has %n hint(s), see the Log tab</source>
+        <translation>
+            <numerusform>У журналі сервера %n підказка, див. вкладку «Журнал»</numerusform>
+            <numerusform>У журналі сервера %n підказки, див. вкладку «Журнал»</numerusform>
+            <numerusform>У журналі сервера %n підказок, див. вкладку «Журнал»</numerusform>
         </translation>
     </message>
 </context>
