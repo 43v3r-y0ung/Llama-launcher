@@ -1480,7 +1480,9 @@ void MainWindow::updateUiState()
     ui->kvWarningLabel->setVisible(kvNeedsFa);
     if (kvNeedsFa)
         ui->kvWarningLabel->setText(QStringLiteral("<span style='color:#d35400'>&#9888; %1</span>")
-                                        .arg(tr("A quantized KV cache needs Flash Attention: set it to Auto or On on the Model tab.").toHtmlEscaped()));
+                                        .arg(tr("A quantized KV cache does not work with Flash Attention forced off. "
+                                                "Set Flash Attention to Auto or On on the Model tab; "
+                                                "the server decides by itself whether your GPU can use it.").toHtmlEscaped()));
 
     // MoE options only make sense for MoE models; keep them enabled if metadata is unknown.
     const bool moeApplicable = !m_modelInfo.valid || m_modelInfo.isMoe();
