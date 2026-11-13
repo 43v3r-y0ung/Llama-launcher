@@ -123,6 +123,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->consoleOutput->setMaximumBlockCount(kMaxConsoleLines);
     QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     ui->consoleOutput->setFont(mono);
+    ui->logAdviceLabel->setVisible(false); // shown once the server log produces a hint
     ui->openBrowserButton->setIcon(QIcon::fromTheme(QStringLiteral("internet-web-browser")));
     ui->copyUrlButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     ui->refreshDevicesButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
@@ -750,9 +751,10 @@ QStringList MainWindow::buildArguments() const
     else
         arguments << "-c" << ui->contextSizeCombo->currentText();
 
-    // --fit adjusts only the parameters left on "auto"; with everything fixed, turn it off.
-    const bool anyAuto = ui->gpuAutoCheck->isChecked() || ui->contextAutoCheck->isChecked();
-    arguments << "--fit" << (anyAuto ? "on" : "off");
+    // --fit adjusts the parameters left on "auto", but llama-server skips it entirely when
+    // -ngl is set by hand ("n_gpu_layers already set by user ... abort"). So it is useful
+    // only with automatic GPU layers; otherwise turn it off rather than have it silently fail.
+    arguments << "--fit" << (ui->gpuAutoCheck->isChecked() ? "on" : "off");
 
     const QString device = ui->deviceCombo->currentData().toString();
     if (!device.isEmpty())
@@ -900,6 +902,8 @@ void MainWindow::startServer()
     m_process->setProcessEnvironment(env);
 
     ui->consoleOutput->clear();
+    m_logAdvisor.reset();
+    updateLogAdvice();
     if (!tlsNote.isEmpty())
         ui->consoleOutput->appendPlainText(tlsNote);
     ui->consoleOutput->appendPlainText(tr("Starting %1 %2").arg(exe, joinCommand(arguments)));
@@ -944,7 +948,26 @@ void MainWindow::readProcessOutput()
         ui->consoleOutput->appendPlainText(trimmed);
         m_lastOutputLine = trimmed;
         m_monitor->feedLogLine(trimmed);
+        if (m_logAdvisor.feedLine(trimmed))
+            updateLogAdvice();
     }
+}
+
+void MainWindow::updateLogAdvice()
+{
+    const QStringList &hints = m_logAdvisor.hints();
+    ui->logAdviceLabel->setVisible(!hints.isEmpty());
+    if (hints.isEmpty()) {
+        ui->logAdviceLabel->clear();
+        return;
+    }
+
+    QString html = QStringLiteral("<b>%1</b><ul style='margin:0'>").arg(tr("Hints from the server log:").toHtmlEscaped());
+    for (const QString &hint : hints)
+        html += QStringLiteral("<li>%1</li>").arg(hint.toHtmlEscaped());
+    html += QStringLiteral("</ul>");
+    ui->logAdviceLabel->setText(QStringLiteral("<span style='color:#d35400'>&#9888;</span> ") + html);
+    statusBar()->showMessage(tr("The server log has %n hint(s), see the Log tab", nullptr, int(hints.size())), 8000);
 }
 
 void MainWindow::on_copyLogButton_clicked()

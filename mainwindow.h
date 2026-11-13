@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "gguf.h"
+#include "logadvisor.h"
 #include "monitor.h"
 
 #include <QMainWindow>
@@ -93,6 +94,7 @@ private:
     bool m_stopRequested = false; // distinguishes a user stop from a crash
     QByteArray m_outputBuffer;    // incomplete trailing line of server output
     QString m_lastOutputLine;
+    LogAdvisor m_logAdvisor;     // hints from known server warnings, shown on the Log tab
 
     QString m_currentModelPath;  // model whose per-model settings are shown in the UI
     GgufInfo m_modelInfo;
@@ -108,6 +110,7 @@ private:
     void updateMonitorActivity(); // sample only while someone can see it or the server runs
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
+    void updateLogAdvice();
     void notify(const QString &title, const QString &message,
                 QSystemTrayIcon::MessageIcon icon = QSystemTrayIcon::Information);
     QUrl serverUrl() const;

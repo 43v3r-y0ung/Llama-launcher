@@ -1112,6 +1112,19 @@
               </attribute>
               <layout class="QVBoxLayout" name="logTabLayout">
                 <item>
+                  <widget class="QLabel" name="logAdviceLabel">
+                    <property name="textFormat">
+                      <enum>Qt::TextFormat::RichText</enum>
+                    </property>
+                    <property name="wordWrap">
+                      <bool>true</bool>
+                    </property>
+                    <property name="textInteractionFlags">
+                      <set>Qt::TextInteractionFlag::TextSelectableByMouse</set>
+                    </property>
+                  </widget>
+                </item>
+                <item>
                   <widget class="QPlainTextEdit" name="consoleOutput">
                     <property name="readOnly">
                       <bool>true</bool>
