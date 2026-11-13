@@ -36,21 +36,21 @@
     </message>
     <message>
         <location filename="../logadvisor.cpp" line="39"/>
-        <source>Flash Attention is not supported on this device for this configuration and was turned off, so the Flash Attention setting has no effect.</source>
-        <translation>Flash Attention не підтримується цим пристроєм для такої конфігурації й був вимкнений, тож налаштування Flash Attention не діє.</translation>
+        <source>The server turned Flash Attention off by itself, as this device does not support it for this configuration. Leave Flash Attention on Auto: there is no need to turn it off by hand, and a quantized KV cache does not work with Flash Attention forced off.</source>
+        <translation>Сервер сам вимкнув Flash Attention, бо цей пристрій не підтримує його для такої конфігурації. Лишіть для Flash Attention «Авто»: вимикати його вручну не потрібно, а квантований KV-кеш не працює, якщо Flash Attention примусово вимкнено.</translation>
     </message>
     <message>
-        <location filename="../logadvisor.cpp" line="46"/>
+        <location filename="../logadvisor.cpp" line="47"/>
         <source>This model does not support Context Shift, so that option has no effect and can be turned off.</source>
         <translation>Ця модель не підтримує Context Shift, тож ця опція не діє і її можна вимкнути.</translation>
     </message>
     <message>
-        <location filename="../logadvisor.cpp" line="52"/>
+        <location filename="../logadvisor.cpp" line="53"/>
         <source>Part of the model (for example MoE experts) is kept on the CPU while the file is memory-mapped. Loading the model fully (Advanced tab, --no-mmap) may be faster.</source>
         <translation>Частина моделі (наприклад, MoE-експерти) лишається на CPU, а файл відображено в пам&apos;ять (mmap). Повне завантаження моделі (вкладка «Додатково», --no-mmap) може бути швидшим.</translation>
     </message>
     <message>
-        <location filename="../logadvisor.cpp" line="61"/>
+        <location filename="../logadvisor.cpp" line="62"/>
         <source>Not enough memory for the requested settings. Lower the context size or the number of GPU layers, use a quantized KV cache, or keep MoE experts on the CPU.</source>
         <translation>Недостатньо пам&apos;яті для вибраних налаштувань. Зменште розмір контексту або кількість шарів на GPU, використайте квантований KV-кеш або залиште MoE-експертів на CPU.</translation>
     </message>

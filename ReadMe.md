@@ -23,7 +23,7 @@ Key Features
         MoE experts on CPU (--cpu-moe / --n-cpu-moe N): for large MoE models on small GPUs, keeps the expert weights in system RAM and the rest in VRAM. On a 4 GB card this doubled prompt processing speed for a 35B-A3B model compared to leaving it to --fit.
         Flash Attention selector (Auto / On / Off, passed as -fa).
     Advanced tab (each option is a checkbox or field instead of a flag to remember):
-        Memory and performance: KV cache type (f16 / q8_0 / q4_0, as -ctk/-ctv; a quantized cache needs Flash Attention and the launcher warns if it is off), KV cache in system RAM (--no-kv-offload), --mlock, --no-mmap, CPU threads (-t), batch / micro-batch (-b / -ub) and parallel slots (-np), each with an Auto checkbox.
+        Memory and performance: KV cache type (f16 / q8_0 / q4_0, as -ctk/-ctv; a quantized cache does not work with Flash Attention forced off, and the launcher warns about that), KV cache in system RAM (--no-kv-offload), --mlock, --no-mmap, CPU threads (-t), batch / micro-batch (-b / -ub) and parallel slots (-np), each with an Auto checkbox.
         Chat: thinking mode Auto / On / Off (--reasoning) and a thinking budget (--reasoning-budget), Jinja chat template (unchecked passes --no-jinja), and the multimodal projector: an mmproj*.gguf file next to the model is detected and can be loaded (--mmproj), optionally kept on the CPU (--no-mmproj-offload).
         Default sampling: temperature, top-p, top-k and min-p, each sent only when checked; clients can still override them per request.
         Other: Context Shift, Prometheus metrics endpoint (--metrics), skip the warm-up run (--no-warmup).

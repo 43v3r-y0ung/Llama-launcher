@@ -36,8 +36,9 @@ bool LogAdvisor::feedLine(const QString &line)
     if (line.contains(QLatin1String("Flash Attention"))
         && line.contains(QLatin1String("set to disabled"))) {
         add(HintId::FlashAttnOff,
-            tr("Flash Attention is not supported on this device for this configuration and was turned off, "
-               "so the Flash Attention setting has no effect."));
+            tr("The server turned Flash Attention off by itself, as this device does not support it "
+               "for this configuration. Leave Flash Attention on Auto: there is no need to turn it off by hand, "
+               "and a quantized KV cache does not work with Flash Attention forced off."));
     }
 
     // common_init_: KV cache shifting is not supported for this context, disabling KV cache shifting
