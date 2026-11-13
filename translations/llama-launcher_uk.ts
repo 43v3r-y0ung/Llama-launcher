@@ -523,8 +523,8 @@
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1006"/>
-        <source>Penalizes tokens that already appeared, regardless of how often (--presence-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</source>
-        <translation>Штрафує токени, які вже з'являлися, незалежно від того, скільки разів (--presence-penalty). llama.cpp враховує лише останні --repeat-last-n токенів (типово 64).</translation>
+        <source>Penalizes tokens that already appeared, regardless of how often (--presence-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default). Leave off for code, SQL or JSON output: it distorts column names and syntax.</source>
+        <translation>Штрафує токени, які вже з&apos;являлися, незалежно від того, скільки разів (--presence-penalty). llama.cpp враховує лише останні --repeat-last-n токенів (типово 64). Не вмикайте для генерації коду, SQL чи JSON: штраф спотворює назви колонок і синтаксис.</translation>
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1032"/>
@@ -533,8 +533,8 @@
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1035"/>
-        <source>Penalizes tokens in proportion to how often they already appeared (--frequency-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</source>
-        <translation>Штрафує токени пропорційно до того, скільки разів вони вже з'являлися (--frequency-penalty). llama.cpp враховує лише останні --repeat-last-n токенів (типово 64).</translation>
+        <source>Penalizes tokens in proportion to how often they already appeared (--frequency-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default). Leave off for code, SQL or JSON output: it distorts column names and syntax.</source>
+        <translation>Штрафує токени пропорційно до того, скільки разів вони вже з&apos;являлися (--frequency-penalty). llama.cpp враховує лише останні --repeat-last-n токенів (типово 64). Не вмикайте для генерації коду, SQL чи JSON: штраф спотворює назви колонок і синтаксис.</translation>
     </message>
     <message>
         <location filename="../mainwindow.ui" line="1064"/>

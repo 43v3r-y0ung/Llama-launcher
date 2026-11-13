@@ -1003,7 +1003,7 @@
                                     <string>Presence penalty</string>
                                   </property>
                                   <property name="toolTip">
-                                    <string>Penalizes tokens that already appeared, regardless of how often (--presence-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</string>
+                                    <string>Penalizes tokens that already appeared, regardless of how often (--presence-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default). Leave off for code, SQL or JSON output: it distorts column names and syntax.</string>
                                   </property>
                                 </widget>
                               </item>
@@ -1032,7 +1032,7 @@
                                     <string>Frequency penalty</string>
                                   </property>
                                   <property name="toolTip">
-                                    <string>Penalizes tokens in proportion to how often they already appeared (--frequency-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default).</string>
+                                    <string>Penalizes tokens in proportion to how often they already appeared (--frequency-penalty). llama.cpp only looks at the last --repeat-last-n tokens (64 by default). Leave off for code, SQL or JSON output: it distorts column names and syntax.</string>
                                   </property>
                                 </widget>
                               </item>
