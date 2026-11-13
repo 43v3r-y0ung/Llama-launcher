@@ -183,7 +183,7 @@ bool ServerProcess::adopt(QStringList *recentOutput)
     m_info.webUi = o.value(QLatin1String("webUi")).toBool(true);
     m_info.lan = o.value(QLatin1String("lan")).toBool();
     m_info.https = o.value(QLatin1String("https")).toBool();
-    m_info.certFile = o.value(QLatin1String("certFile")).toString();
+    m_info.certPem = o.value(QLatin1String("certPem")).toString().toLatin1();
     m_info.startedAt = QDateTime::fromString(o.value(QLatin1String("startedAt")).toString(), Qt::ISODate);
 
     int exitCode = -1, crashSignal = 0;
@@ -352,7 +352,7 @@ void ServerProcess::writeState() const
         {QStringLiteral("webUi"), m_info.webUi},
         {QStringLiteral("lan"), m_info.lan},
         {QStringLiteral("https"), m_info.https},
-        {QStringLiteral("certFile"), m_info.certFile},
+        {QStringLiteral("certPem"), QString::fromLatin1(m_info.certPem)},
         {QStringLiteral("startedAt"), m_info.startedAt.toString(Qt::ISODate)},
     };
     QSaveFile f(stateFilePath());

@@ -31,7 +31,7 @@ public:
         bool webUi = true;
         bool lan = false;
         bool https = false;
-        QString certFile;
+        QByteArray certPem; // what an HTTPS server presents: the launcher trusts exactly this
         QDateTime startedAt;
     };
 

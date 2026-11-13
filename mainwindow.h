@@ -95,6 +95,8 @@ private:
     QAction *m_menuStopAction = nullptr;
     QAction *m_menuRestartAction = nullptr;
     QAction *m_restartIdleAction = nullptr;
+    QToolButton *m_applyButton = nullptr;     // "Restart to Apply", shown while settings differ from the running server
+    QTimer *m_pendingTimer = nullptr;
     QAction *m_stopIdleAction = nullptr;
     enum WhenIdle { IdleNothing, IdleRestart, IdleStop };
     WhenIdle m_whenIdle = IdleNothing; // done once no request is being processed
@@ -135,6 +137,7 @@ private:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void setStatus(Status status);
     void updateStatusText();     // status line and tray tooltip
+    void updatePendingChanges(); // compares the settings with what the running server was started with
     void updateLogAdvice();
     void onLogAdviceLinkActivated(const QString &link);
     static QString hintFixLabel(LogAdvisor::HintId id); // empty when the hint has no one-click fix

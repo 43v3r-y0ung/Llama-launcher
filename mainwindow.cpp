@@ -49,6 +49,53 @@ enum Reasoning { ReasoningAuto = 0, ReasoningOn = 1, ReasoningOff = 2 };
 const QStringList kKvCacheTypes = {QStringLiteral("f16"), QStringLiteral("q8_0"), QStringLiteral("q4_0")};
 
 // Inverse of QProcess::splitCommand(): quote tokens that would otherwise be split or mangled.
+// Server arguments grouped by option: "--temp 0.8" -> {"--temp", "0.8"}. Repeated options keep all values.
+QMap<QString, QStringList> groupOptions(const QStringList &args)
+{
+    static const QRegularExpression number(QStringLiteral("^-?[0-9.]+$"));
+    QMap<QString, QStringList> groups;
+    QString option;
+    QStringList values;
+    auto flush = [&] {
+        if (!option.isEmpty() || !values.isEmpty())
+            groups[option] << values.join(QLatin1Char(' '));
+    };
+    for (const QString &a : args) {
+        if (a.startsWith(QLatin1Char('-')) && !number.match(a).hasMatch()) {
+            flush();
+            option = a;
+            values.clear();
+        } else {
+            values << (option == QLatin1String("--model") || option == QLatin1String("--mmproj") ? QFileInfo(a).fileName() : a);
+        }
+    }
+    flush();
+    return groups;
+}
+
+// What changes when the server is started with `next` instead of `running`, one line per option.
+QStringList diffArguments(const QStringList &running, const QStringList &next)
+{
+    const QMap<QString, QStringList> before = groupOptions(running), after = groupOptions(next);
+    auto show = [](const QString &option, const QStringList &values) {
+        const QString v = values.join(QStringLiteral(", ")).trimmed();
+        return v.isEmpty() ? option : option + QLatin1Char(' ') + v;
+    };
+    QStringList lines;
+    for (auto it = before.begin(); it != before.end(); ++it) {
+        if (!after.contains(it.key()))
+            lines << QStringLiteral("\u2212 ") + show(it.key(), it.value());
+        else if (after.value(it.key()) != it.value())
+            lines << QStringLiteral("%1: %2 \u2192 %3").arg(it.key(), it.value().join(QStringLiteral(", ")),
+                                                          after.value(it.key()).join(QStringLiteral(", ")));
+    }
+    for (auto it = after.begin(); it != after.end(); ++it) {
+        if (!before.contains(it.key()))
+            lines << QStringLiteral("+ ") + show(it.key(), it.value());
+    }
+    return lines;
+}
+
 QString joinCommand(const QStringList &tokens)
 {
     QStringList quoted;
@@ -503,10 +550,27 @@ void MainWindow::setupCornerControls()
     menuButton->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; }"));
     menuButton->setMenu(menu);
 
+    // Shown while the settings differ from what the running server was started with.
+    m_applyButton = new QToolButton(this);
+    m_applyButton->setText(tr("Restart to Apply"));
+    m_applyButton->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
+    m_applyButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_applyButton->setPopupMode(QToolButton::InstantPopup);
+    auto *applyMenu = new QMenu(m_applyButton);
+    applyMenu->addAction(m_menuRestartAction);
+    applyMenu->addAction(m_restartIdleAction);
+    m_applyButton->setMenu(applyMenu);
+    m_applyButton->hide();
+    m_pendingTimer = new QTimer(this);
+    m_pendingTimer->setInterval(1000);
+    connect(m_pendingTimer, &QTimer::timeout, this, &MainWindow::updatePendingChanges);
+    m_pendingTimer->start();
+
     auto *corner = new QWidget(this);
     auto *layout = new QHBoxLayout(corner);
     layout->setContentsMargins(0, 0, 0, 2);
     layout->setSpacing(4);
+    layout->addWidget(m_applyButton);
     layout->addWidget(m_startStopButton);
     layout->addWidget(menuButton);
     ui->tabWidget->setCornerWidget(corner, Qt::TopRightCorner);
@@ -663,6 +727,7 @@ void MainWindow::setStatus(Status status)
     }
 
     updateUiState();
+    updatePendingChanges();
 }
 
 void MainWindow::updateStatusText()
@@ -711,6 +776,32 @@ void MainWindow::updateStatusText()
             tooltip += QLatin1Char('\n') + lanUrl().toString();
         m_trayIcon->setToolTip(tooltip);
     }
+}
+
+void MainWindow::updatePendingChanges()
+{
+    if (!m_server->isRunning()) {
+        m_applyButton->hide();
+        return;
+    }
+    if (!isVisible() || m_loading)
+        return;
+
+    const ServerProcess::Info &running = m_server->info();
+    QStringList changes;
+    const QString exe = serverExecutable();
+    const QString resolved = QFileInfo(exe.contains(QLatin1Char('/')) ? exe : QStandardPaths::findExecutable(exe)).absoluteFilePath();
+    if (resolved != running.exe)
+        changes << tr("llama-server: %1 \u2192 %2").arg(running.exe, resolved);
+    if (ui->apiKeyEdit->text().trimmed() != running.apiKey)
+        changes << tr("API key changed");
+    changes << diffArguments(running.args, buildArguments());
+
+    m_applyButton->setVisible(!changes.isEmpty());
+    if (!changes.isEmpty())
+        m_applyButton->setToolTip(tr("Settings changed since the server was started:") + QLatin1Char('\n')
+                                  + changes.join(QLatin1Char('\n')) + QStringLiteral("\n\n")
+                                  + tr("They take effect when the server is restarted."));
 }
 
 void MainWindow::setWhenIdle(int action)
@@ -1083,7 +1174,8 @@ void MainWindow::startServer()
     info.webUi = !ui->noUiCheck->isChecked();
     info.lan = ui->lanAccessCheck->isChecked();
     info.https = httpsEnabled();
-    info.certFile = info.https ? tlsCertFile() : QString();
+    if (info.https)
+        info.certPem = TlsCert::firstCertificate(tlsCertFile()).toPem();
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.remove(QStringLiteral("LLAMA_API_KEY"));
@@ -1144,7 +1236,7 @@ void MainWindow::serverStarted()
     m_runningWebUi = info.webUi;
     m_runningLan = info.lan;
     m_runningHttps = info.https;
-    m_runningCert = info.https ? TlsCert::firstCertificate(info.certFile) : QSslCertificate();
+    m_runningCert = info.https ? QSslCertificate(info.certPem) : QSslCertificate();
     m_monitor->resetServerStats();
     setStatus(Status::Loading);
     m_healthTimer->start();
@@ -1632,8 +1724,6 @@ void MainWindow::updateFitWarning()
 
 void MainWindow::updateUiState()
 {
-    const bool running = m_server->isRunning();
-
     ui->gpuLayersSpin->setDisabled(ui->gpuAutoCheck->isChecked());
     ui->contextSizeCombo->setDisabled(ui->contextAutoCheck->isChecked());
 
@@ -1670,30 +1760,19 @@ void MainWindow::updateUiState()
     if (m_modelInfo.blockCount)
         ui->moeLayersSpin->setMaximum(int(m_modelInfo.blockCount));
 
-    // Changing the model or binary while the server runs would not affect it; avoid confusion.
-    ui->modelGroup->setEnabled(!running);
-    ui->paramsGroup->setEnabled(!running);
-    ui->advancedGroup->setEnabled(!running);
-    ui->deviceCombo->setEnabled(!running);
-    ui->refreshDevicesButton->setEnabled(!running);
-    ui->portSpin->setEnabled(!running);
-    ui->noUiCheck->setEnabled(!running);
-    ui->lanAccessCheck->setEnabled(!running);
-    ui->apiKeyEdit->setEnabled(!running);
-    ui->generateKeyButton->setEnabled(!running);
+    // Everything stays editable while the server runs: changes apply at the next start, and
+    // updatePendingChanges() offers "Restart to Apply" with the list of differences.
     const bool lan = ui->lanAccessCheck->isChecked();
-    ui->httpsCheck->setEnabled(!running && !lan);
+    ui->httpsCheck->setEnabled(!lan);
     ui->httpsCheck->setToolTip(lan ? tr("Always on while access from the local network is allowed: "
                                         "nothing leaves this computer unencrypted.")
                                    : tr("Serve over HTTPS so prompts, answers and the API key cannot be read "
                                         "on the network (--ssl-cert-file / --ssl-key-file)."));
-    const bool tlsEditable = !running && httpsEnabled();
+    const bool tlsEditable = httpsEnabled();
     for (QWidget *w : {static_cast<QWidget *>(ui->certFileEdit), static_cast<QWidget *>(ui->keyFileEdit),
                        static_cast<QWidget *>(ui->certBrowseButton), static_cast<QWidget *>(ui->keyBrowseButton)})
         w->setEnabled(tlsEditable);
     ui->generateCertButton->setEnabled(tlsEditable && usesManagedCert());
-    ui->serverPathEdit->setEnabled(!running);
-    ui->serverBrowseButton->setEnabled(!running);
 }
 
 QString MainWindow::autostartFilePath()
