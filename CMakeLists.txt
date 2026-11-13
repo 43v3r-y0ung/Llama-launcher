@@ -24,6 +24,8 @@ qt_add_executable(Llama-launcher
     tlscert.h
     serverprocess.cpp
     serverprocess.h
+    moetuner.cpp
+    moetuner.h
     resources.qrc
 )
 

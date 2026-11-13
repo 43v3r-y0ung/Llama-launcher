@@ -73,6 +73,7 @@ private slots:
     void requestQuit();
     void setupCornerControls();
     void setupSamplingPresets();
+    void tuneMoe();              // llama-bench over --n-cpu-moe values
     void updatePresetCombo();    // selects the preset the sampling values match, if any
     void applySamplingPreset(int index);
     void saveSamplingPreset();
@@ -104,6 +105,7 @@ private:
     QToolButton *m_applyButton = nullptr;     // "Restart to Apply", shown while settings differ from the running server
     QTimer *m_pendingTimer = nullptr;
     QComboBox *m_presetCombo = nullptr;
+    QToolButton *m_tuneMoeButton = nullptr;
     QToolButton *m_deletePresetButton = nullptr;
     QAction *m_stopIdleAction = nullptr;
     enum WhenIdle { IdleNothing, IdleRestart, IdleStop };

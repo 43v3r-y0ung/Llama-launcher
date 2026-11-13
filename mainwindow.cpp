@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "tlscert.h"
+#include "moetuner.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -231,6 +232,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_healthTimer, &QTimer::timeout, this, &MainWindow::checkServerHealth);
     setupCharts();
     setupSamplingPresets();
+    m_tuneMoeButton = new QToolButton(this);
+    m_tuneMoeButton->setText(tr("Find Fastest..."));
+    m_tuneMoeButton->setToolTip(tr("Benchmark with llama-bench which number of expert layers on the CPU gives the fastest generation"));
+    ui->moeLayout->addWidget(m_tuneMoeButton);
+    connect(m_tuneMoeButton, &QToolButton::clicked, this, &MainWindow::tuneMoe);
     connect(m_monitor, &Monitor::sampled, this, &MainWindow::onMonitorSample);
     m_healthTimer->setInterval(2000);
 
@@ -962,6 +968,55 @@ void MainWindow::deleteSamplingPreset()
     settings.endGroup();
     settings.sync();
     updatePresetCombo();
+}
+
+void MainWindow::tuneMoe()
+{
+    if (m_server->isRunning()) {
+        QMessageBox::information(this, tr("Find the Fastest MoE Split"),
+                                 tr("Stop the server first: the benchmark needs the GPU memory the server is using."));
+        return;
+    }
+    // llama-bench comes with llama-server; prefer the one from the same build.
+    const QString exe = serverExecutable();
+    const QFileInfo server(exe.contains(QLatin1Char('/')) ? exe : QStandardPaths::findExecutable(exe));
+    QString bench = server.absolutePath() + QStringLiteral("/llama-bench");
+    if (!QFileInfo(bench).isExecutable())
+        bench = QStandardPaths::findExecutable(QStringLiteral("llama-bench"));
+    if (bench.isEmpty()) {
+        QMessageBox::warning(this, tr("Warning"), tr("llama-bench was not found next to %1 or in PATH.").arg(server.absoluteFilePath()));
+        return;
+    }
+
+    // The settings that affect GPU memory and speed, as the server would use them.
+    MoeTuner::Params params;
+    params.benchExe = bench;
+    params.model = ui->modelCombo->currentData().toString();
+    params.layers = int(m_modelInfo.blockCount);
+    const QString device = ui->deviceCombo->count() > 0 ? ui->deviceCombo->currentData().toString() : m_savedDevice;
+    if (!device.isEmpty())
+        params.extraArgs << QStringLiteral("-dev") << device;
+    switch (ui->flashAttnCombo->currentIndex()) {
+    case FaOn: params.extraArgs << QStringLiteral("-fa") << QStringLiteral("on"); break;
+    case FaOff: params.extraArgs << QStringLiteral("-fa") << QStringLiteral("off"); break;
+    default: break;
+    }
+    if (const int kv = ui->kvCacheCombo->currentIndex(); kv > 0)
+        params.extraArgs << QStringLiteral("-ctk") << kKvCacheTypes.at(kv) << QStringLiteral("-ctv") << kKvCacheTypes.at(kv);
+    if (ui->kvOnCpuCheck->isChecked())
+        params.extraArgs << QStringLiteral("-nkvo") << QStringLiteral("1");
+    if (!ui->threadsAutoCheck->isChecked())
+        params.extraArgs << QStringLiteral("-t") << QString::number(ui->threadsSpin->value());
+    if (!ui->batchAutoCheck->isChecked())
+        params.extraArgs << QStringLiteral("-b") << QString::number(ui->batchSpin->value())
+                         << QStringLiteral("-ub") << QString::number(ui->ubatchSpin->value());
+
+    MoeTuner tuner(params, this);
+    if (tuner.exec() == QDialog::Accepted && tuner.chosenValue() >= 0) {
+        ui->moeModeCombo->setCurrentIndex(MoeFirstN);
+        ui->moeLayersSpin->setValue(tuner.chosenValue());
+        statusBar()->showMessage(tr("MoE experts on CPU: first %1 layers").arg(tuner.chosenValue()), 5000);
+    }
 }
 
 void MainWindow::updatePendingChanges()
@@ -1943,6 +1998,8 @@ void MainWindow::updateUiState()
     ui->moeModeCombo->setEnabled(moeApplicable);
     ui->moeLayersSpin->setEnabled(moeApplicable && ui->moeModeCombo->currentIndex() == MoeFirstN);
     ui->labelMoe->setEnabled(moeApplicable);
+    if (m_tuneMoeButton)
+        m_tuneMoeButton->setEnabled(m_modelInfo.valid && m_modelInfo.isMoe() && m_modelInfo.blockCount > 0);
     if (m_modelInfo.blockCount)
         ui->moeLayersSpin->setMaximum(int(m_modelInfo.blockCount));
 

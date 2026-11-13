@@ -36,6 +36,7 @@ Key Features
         Restart or stop when idle: the menu can restart or stop the server once the requests in progress have finished (read from the server's /slots). The status line, the tray tooltip and the quit dialog show how many requests are being processed.
         Settings stay editable while the server runs. When they differ from what the server was started with, a Restart to Apply button appears next to Start/Stop; its tooltip lists the changes (e.g. --temp 0.8 → 0.6), and it restarts the server now or once it is idle.
         Sampling presets: save the Default sampling values under a name (e.g. one for SQL with the penalties off, one for chat) and apply them to any model; the preset list shows which preset the current values match.
+        Find the fastest MoE split: for Mixture-of-Experts models, a button next to "MoE experts on CPU" runs llama-bench (from the same folder as llama-server) over --n-cpu-moe values with your device, Flash Attention and KV cache settings, and applies the fastest one. The server has to be stopped while it runs.
         Dynamic Tooltips: Hover over the tray icon to see real-time server status, the loaded model and its URL.
         Quick Access Menu: Start/Stop the server, open it in the browser or exit from the right-click context menu.
         Notifications when the server is ready, fails to start or stops unexpectedly (can be turned off).
