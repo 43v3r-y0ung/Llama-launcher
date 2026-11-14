@@ -1024,6 +1024,35 @@ void MainWindow::tuneMoe()
         params.extraArgs << QStringLiteral("-b") << QString::number(ui->batchSpin->value())
                          << QStringLiteral("-ub") << QString::number(ui->ubatchSpin->value());
 
+    // GPU memory check with what the server allocates besides the experts: the context (KV cache)
+    // and the slots, which llama-bench's short runs hardly need.
+    const QString fit = server.absolutePath() + QStringLiteral("/llama-fit-params");
+    if (QFileInfo(fit).isExecutable()) {
+        params.fitExe = fit;
+        params.serverExe = server.absoluteFilePath();
+        QStringList &f = params.fitArgs;
+        f << QStringLiteral("-m") << params.model << QStringLiteral("-ngl") << QStringLiteral("99") << QStringLiteral("-c")
+          << (ui->contextAutoCheck->isChecked() ? QStringLiteral("0") : ui->contextSizeCombo->currentText())
+          // llama-server's automatic number of slots is 4
+          << QStringLiteral("-np") << QString::number(ui->parallelAutoCheck->isChecked() ? 4 : ui->parallelSpin->value());
+        if (!device.isEmpty())
+            f << QStringLiteral("--device") << device;
+        switch (ui->flashAttnCombo->currentIndex()) {
+        case FaOn: f << QStringLiteral("-fa") << QStringLiteral("on"); break;
+        case FaOff: f << QStringLiteral("-fa") << QStringLiteral("off"); break;
+        default: break;
+        }
+        if (const int kv = ui->kvCacheCombo->currentIndex(); kv > 0)
+            f << QStringLiteral("-ctk") << kKvCacheTypes.at(kv) << QStringLiteral("-ctv") << kKvCacheTypes.at(kv);
+        if (ui->kvOnCpuCheck->isChecked())
+            f << QStringLiteral("-nkvo");
+        if (!ui->batchAutoCheck->isChecked())
+            f << QStringLiteral("-b") << QString::number(ui->batchSpin->value()) << QStringLiteral("-ub")
+              << QString::number(ui->ubatchSpin->value());
+        if (ui->mmprojCheck->isChecked() && !m_mmprojPath.isEmpty() && !ui->mmprojCpuCheck->isChecked())
+            params.extraGpuMiB = QFileInfo(m_mmprojPath).size() / (1024 * 1024);
+    }
+
     MoeTuner tuner(params, this);
     if (tuner.exec() == QDialog::Accepted && tuner.chosenValue() >= 0) {
         ui->moeModeCombo->setCurrentIndex(MoeFirstN);

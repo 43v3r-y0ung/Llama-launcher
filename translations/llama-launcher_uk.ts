@@ -55,9 +55,9 @@
     <message>
         <location filename="../mainwindow.ui" line="14"/>
         <location filename="../mainwindow.cpp" line="501"/>
-        <location filename="../mainwindow.cpp" line="1384"/>
-        <location filename="../mainwindow.cpp" line="1392"/>
-        <location filename="../mainwindow.cpp" line="1404"/>
+        <location filename="../mainwindow.cpp" line="1413"/>
+        <location filename="../mainwindow.cpp" line="1421"/>
+        <location filename="../mainwindow.cpp" line="1433"/>
         <source>Llama Launcher</source>
         <translation>Llama Launcher</translation>
     </message>
@@ -286,7 +286,7 @@
     </message>
     <message>
         <location filename="../mainwindow.ui" line="441"/>
-        <location filename="../mainwindow.cpp" line="2082"/>
+        <location filename="../mainwindow.cpp" line="2111"/>
         <source>Serve over HTTPS so prompts, answers and the API key cannot be read on the network (--ssl-cert-file / --ssl-key-file).</source>
         <translation>Працювати через HTTPS, щоб запити, відповіді та API-ключ не можна було прочитати в мережі (--ssl-cert-file / --ssl-key-file).</translation>
     </message>
@@ -868,67 +868,67 @@ Model: %1
 %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1091"/>
+        <location filename="../mainwindow.cpp" line="1120"/>
         <source>Copied %1</source>
         <translation>Скопійовано %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1116"/>
+        <location filename="../mainwindow.cpp" line="1145"/>
         <source>no network connection found</source>
         <translation>мережеве з’єднання не знайдено</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1118"/>
+        <location filename="../mainwindow.cpp" line="1147"/>
         <source>Other computers can connect at %1</source>
         <translation>Інші комп’ютери можуть підключатися за адресою %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1120"/>
+        <location filename="../mainwindow.cpp" line="1149"/>
         <source>No API key: anyone on the network can use the server. Set a key, especially on public Wi-Fi.</source>
         <translation>Ключа API немає: будь-хто в мережі зможе користуватися сервером. Задайте ключ, особливо в публічних Wi-Fi.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1128"/>
+        <location filename="../mainwindow.cpp" line="1157"/>
         <source>A certificate will be created when the server starts.</source>
         <translation>Сертифікат буде створено під час запуску сервера.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1132"/>
+        <location filename="../mainwindow.cpp" line="1161"/>
         <source>To avoid browser warnings on other devices, import the CA certificate %1 there once and trust it for websites.</source>
         <translation>Щоб на інших пристроях не було попереджень браузера, один раз імпортуйте туди сертифікат CA %1 і дозвольте йому довіру для вебсайтів.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1137"/>
+        <location filename="../mainwindow.cpp" line="1166"/>
         <source>The server certificate will be renewed at start (%1).</source>
         <translation>Сертифікат сервера буде оновлено під час запуску (%1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1140"/>
+        <location filename="../mainwindow.cpp" line="1169"/>
         <source>Choose both the certificate and its private key, or clear both to let the launcher create them.</source>
         <translation>Виберіть і сертифікат, і його приватний ключ, або очистьте обидва поля, щоб лаунчер створив їх сам.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1144"/>
+        <location filename="../mainwindow.cpp" line="1173"/>
         <source>Qt has no TLS support here, so the launcher cannot check the server&apos;s status.</source>
         <translation>Qt тут не підтримує TLS, тому лаунчер не зможе перевіряти стан сервера.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1182"/>
+        <location filename="../mainwindow.cpp" line="1211"/>
         <source>Created a new server certificate (%1) for %2 in %3</source>
         <translation>Створено новий сертифікат сервера (%1) для %2 у %3</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1190"/>
+        <location filename="../mainwindow.cpp" line="1219"/>
         <source>choose both the certificate and its private key, or clear both to let the launcher create them.</source>
         <translation>виберіть і сертифікат, і його приватний ключ, або очистьте обидва поля, щоб лаунчер створив їх сам.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1194"/>
+        <location filename="../mainwindow.cpp" line="1223"/>
         <source>%1 is not a readable PEM certificate.</source>
         <translation>%1 не є читабельним PEM-сертифікатом.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1198"/>
+        <location filename="../mainwindow.cpp" line="1227"/>
         <source>cannot read the private key %1.</source>
         <translation>не вдається прочитати приватний ключ %1.</translation>
     </message>
@@ -936,11 +936,11 @@ Model: %1
         <location filename="../mainwindow.cpp" line="652"/>
         <location filename="../mainwindow.cpp" line="950"/>
         <location filename="../mainwindow.cpp" line="1000"/>
-        <location filename="../mainwindow.cpp" line="1223"/>
-        <location filename="../mainwindow.cpp" line="1382"/>
-        <location filename="../mainwindow.cpp" line="1390"/>
-        <location filename="../mainwindow.cpp" line="1402"/>
-        <location filename="../mainwindow.cpp" line="2121"/>
+        <location filename="../mainwindow.cpp" line="1252"/>
+        <location filename="../mainwindow.cpp" line="1411"/>
+        <location filename="../mainwindow.cpp" line="1419"/>
+        <location filename="../mainwindow.cpp" line="1431"/>
+        <location filename="../mainwindow.cpp" line="2150"/>
         <source>Warning</source>
         <translation>Попередження</translation>
     </message>
@@ -970,101 +970,101 @@ Model: %1
         <translation>Не вдалося запустити %1.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1223"/>
+        <location filename="../mainwindow.cpp" line="1252"/>
         <source>Could not create the certificate: %1</source>
         <translation>Не вдалося створити сертифікат: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1226"/>
+        <location filename="../mainwindow.cpp" line="1255"/>
         <source>Created a certificate for %1</source>
         <translation>Створено сертифікат для %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1232"/>
+        <location filename="../mainwindow.cpp" line="1261"/>
         <source>Select certificate</source>
         <translation>Виберіть сертифікат</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1233"/>
+        <location filename="../mainwindow.cpp" line="1262"/>
         <source>PEM files (*.pem *.crt *.cer);;All files (*)</source>
         <translation>Файли PEM (*.pem *.crt *.cer);;Усі файли (*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1240"/>
+        <location filename="../mainwindow.cpp" line="1269"/>
         <source>Select private key</source>
         <translation>Виберіть приватний ключ</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1242"/>
+        <location filename="../mainwindow.cpp" line="1271"/>
         <source>PEM files (*.pem *.key);;All files (*)</source>
         <translation>Файли PEM (*.pem *.key);;Усі файли (*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1382"/>
-        <location filename="../mainwindow.cpp" line="1384"/>
+        <location filename="../mainwindow.cpp" line="1411"/>
+        <location filename="../mainwindow.cpp" line="1413"/>
         <source>Please select a model first.</source>
         <translation>Спочатку виберіть модель.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1388"/>
+        <location filename="../mainwindow.cpp" line="1417"/>
         <source>Model file not found:
 %1</source>
         <translation>Файл моделі не знайдено:
 %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1400"/>
+        <location filename="../mainwindow.cpp" line="1429"/>
         <source>HTTPS: %1</source>
         <translation>HTTPS: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1446"/>
+        <location filename="../mainwindow.cpp" line="1475"/>
         <source>Starting %1 %2</source>
         <translation>Запуск %1 %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1475"/>
+        <location filename="../mainwindow.cpp" line="1504"/>
         <source>Picked up the server that was already running (started %1).</source>
         <translation>Підхоплено сервер, що вже працював (запущено %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1503"/>
+        <location filename="../mainwindow.cpp" line="1532"/>
         <source>Stopping server...</source>
         <translation>Зупинка сервера...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1537"/>
+        <location filename="../mainwindow.cpp" line="1566"/>
         <source>changed, takes effect after a restart</source>
         <translation>змінено, діятиме після перезапуску</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1546"/>
+        <location filename="../mainwindow.cpp" line="1575"/>
         <source>Restart the server</source>
         <translation>Перезапустити сервер</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1546"/>
+        <location filename="../mainwindow.cpp" line="1575"/>
         <source>Start the server</source>
         <translation>Запустити сервер</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1554"/>
+        <location filename="../mainwindow.cpp" line="1583"/>
         <source>Set GPU layers to Auto</source>
         <translation>Увімкнути «Авто» для шарів GPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1555"/>
+        <location filename="../mainwindow.cpp" line="1584"/>
         <source>Turn off Context Shift</source>
         <translation>Вимкнути Context Shift</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1660"/>
+        <location filename="../mainwindow.cpp" line="1689"/>
         <source>Log copied to clipboard</source>
         <translation>Журнал скопійовано в буфер обміну</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1412"/>
-        <location filename="../mainwindow.cpp" line="1450"/>
+        <location filename="../mainwindow.cpp" line="1441"/>
+        <location filename="../mainwindow.cpp" line="1479"/>
         <source>Could not start %1: %2</source>
         <translation>Не вдалося запустити %1: %2</translation>
     </message>
@@ -1233,148 +1233,148 @@ Model: %1
         <translation>llama-bench не знайдено ні поруч із %1, ні в PATH.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1031"/>
+        <location filename="../mainwindow.cpp" line="1060"/>
         <source>MoE experts on CPU: first %1 layers</source>
         <translation>Експерти MoE на CPU: перші %1 шарів</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1049"/>
+        <location filename="../mainwindow.cpp" line="1078"/>
         <source>llama-server: %1 → %2</source>
         <translation>llama-server: %1 → %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1051"/>
+        <location filename="../mainwindow.cpp" line="1080"/>
         <source>API key changed</source>
         <translation>Змінено API-ключ</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1056"/>
+        <location filename="../mainwindow.cpp" line="1085"/>
         <source>Settings changed since the server was started:</source>
         <translation>Налаштування, змінені після запуску сервера:</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1058"/>
+        <location filename="../mainwindow.cpp" line="1087"/>
         <source>They take effect when the server is restarted.</source>
         <translation>Вони наберуть чинності після перезапуску сервера.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1415"/>
-        <location filename="../mainwindow.cpp" line="1453"/>
+        <location filename="../mainwindow.cpp" line="1444"/>
+        <location filename="../mainwindow.cpp" line="1482"/>
         <source>Llama server failed to start</source>
         <translation>Сервер не запустився</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1653"/>
+        <location filename="../mainwindow.cpp" line="1682"/>
         <source>Copied the command line of the running server</source>
         <translation>Скопійовано командний рядок запущеного сервера</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1654"/>
+        <location filename="../mainwindow.cpp" line="1683"/>
         <source>Copied the command line Start would run</source>
         <translation>Скопійовано командний рядок, який виконає запуск</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1675"/>
+        <location filename="../mainwindow.cpp" line="1704"/>
         <source>Server stopped (signal %1).</source>
         <translation>Сервер зупинено (сигнал %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1676"/>
+        <location filename="../mainwindow.cpp" line="1705"/>
         <source>Server crashed (signal %1).</source>
         <translation>Сервер аварійно завершився (сигнал %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1678"/>
+        <location filename="../mainwindow.cpp" line="1707"/>
         <source>Server stopped (exit code %1).</source>
         <translation>Сервер зупинено (код виходу %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1680"/>
+        <location filename="../mainwindow.cpp" line="1709"/>
         <source>Server stopped.</source>
         <translation>Сервер зупинено.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1688"/>
+        <location filename="../mainwindow.cpp" line="1717"/>
         <source>Server stopped unexpectedly (exit code %1).</source>
         <translation>Сервер несподівано зупинився (код виходу %1).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1691"/>
+        <location filename="../mainwindow.cpp" line="1720"/>
         <source>Llama server stopped</source>
         <translation>Сервер зупинився</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1732"/>
+        <location filename="../mainwindow.cpp" line="1761"/>
         <source>Select llama-server</source>
         <translation>Виберіть llama-server</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1785"/>
+        <location filename="../mainwindow.cpp" line="1814"/>
         <source>Checking %1...</source>
         <translation>Перевірка %1...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1792"/>
+        <location filename="../mainwindow.cpp" line="1821"/>
         <source>%1 &amp;mdash; version %2</source>
         <translation>%1 &amp;mdash; версія %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1796"/>
+        <location filename="../mainwindow.cpp" line="1825"/>
         <source>Cannot run %1</source>
         <translation>Не вдається запустити %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1809"/>
+        <location filename="../mainwindow.cpp" line="1838"/>
         <source>All GPUs (auto)</source>
         <translation>Усі GPU (авто)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1825"/>
+        <location filename="../mainwindow.cpp" line="1854"/>
         <source>CPU only</source>
         <translation>Лише CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1839"/>
+        <location filename="../mainwindow.cpp" line="1868"/>
         <source>%1 (not detected)</source>
         <translation>%1 (не знайдено)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1854"/>
+        <location filename="../mainwindow.cpp" line="1883"/>
         <source>Select Model</source>
         <translation>Виберіть модель</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1855"/>
+        <location filename="../mainwindow.cpp" line="1884"/>
         <source>GGUF Models (*.gguf);;All Files (*)</source>
         <translation>Моделі GGUF (*.gguf);;Усі файли (*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1864"/>
+        <location filename="../mainwindow.cpp" line="1893"/>
         <source>Select Models Folder</source>
         <translation>Виберіть теку моделей</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1922"/>
+        <location filename="../mainwindow.cpp" line="1951"/>
         <source>(missing)</source>
         <translation>(відсутня)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1952"/>
+        <location filename="../mainwindow.cpp" line="1981"/>
         <source>No mmproj*.gguf file next to the model.</source>
         <translation>Поруч із моделлю немає файлу mmproj*.gguf.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1956"/>
+        <location filename="../mainwindow.cpp" line="1985"/>
         <source>No model selected.</source>
         <translation>Модель не вибрано.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1965"/>
+        <location filename="../mainwindow.cpp" line="1994"/>
         <source>Cannot read model metadata: %1</source>
         <translation>Не вдалося прочитати метадані моделі: %1</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1974"/>
+        <location filename="../mainwindow.cpp" line="2003"/>
         <source>%n parts</source>
         <translation>
             <numerusform>%n частина</numerusform>
@@ -1383,7 +1383,7 @@ Model: %1
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1976"/>
+        <location filename="../mainwindow.cpp" line="2005"/>
         <source>%n layers</source>
         <translation>
             <numerusform>%n шар</numerusform>
@@ -1392,52 +1392,52 @@ Model: %1
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1978"/>
+        <location filename="../mainwindow.cpp" line="2007"/>
         <source>native context %1</source>
         <translation>рідний контекст %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1980"/>
+        <location filename="../mainwindow.cpp" line="2009"/>
         <source>MoE: %1 experts, %2 active</source>
         <translation>MoE: %1 експертів, %2 активних</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2004"/>
+        <location filename="../mainwindow.cpp" line="2033"/>
         <source>all GPUs</source>
         <translation>усіх GPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2018"/>
+        <location filename="../mainwindow.cpp" line="2047"/>
         <source>Model (%1) fits into free VRAM on %2 (%3).</source>
         <translation>Модель (%1) вміщується у вільну відеопам’ять %2 (%3).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2022"/>
+        <location filename="../mainwindow.cpp" line="2051"/>
         <source>Model (%1) is larger than free VRAM on %2 (%3): part of it will run on the CPU, which is slower.</source>
         <translation>Модель (%1) більша за вільну відеопам’ять %2 (%3): частина виконуватиметься на CPU, а це повільніше.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2025"/>
+        <location filename="../mainwindow.cpp" line="2054"/>
         <source>For this MoE model, keeping the experts on the CPU (option below) usually gives the best speed.</source>
         <translation>Для цієї MoE-моделі найкращу швидкість зазвичай дає розміщення експертів на CPU (опція нижче).</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2062"/>
+        <location filename="../mainwindow.cpp" line="2091"/>
         <source>A quantized KV cache does not work with Flash Attention forced off. Set Flash Attention to Auto or On on the Model tab; the server decides by itself whether your GPU can use it.</source>
         <translation>Квантований KV-кеш не працює, якщо Flash Attention примусово вимкнено. Встановіть для Flash Attention «Авто» або «Увімк.» на вкладці «Модель»: сервер сам визначить, чи може ваш GPU його використати.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2080"/>
+        <location filename="../mainwindow.cpp" line="2109"/>
         <source>Always on while access from the local network is allowed: nothing leaves this computer unencrypted.</source>
         <translation>Завжди ввімкнено, коли дозволено доступ із локальної мережі: ніщо не залишає цей комп’ютер незашифрованим.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="2121"/>
+        <location filename="../mainwindow.cpp" line="2150"/>
         <source>Could not write %1</source>
         <translation>Не вдалося записати %1</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="2342"/>
+        <location filename="../mainwindow.cpp" line="2371"/>
         <source>Moved %n option(s) from Extra Arguments to the Advanced tab</source>
         <translation>
             <numerusform>Перенесено %n опцію з додаткових аргументів на вкладку «Додатково»</numerusform>
@@ -1446,12 +1446,12 @@ Model: %1
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1532"/>
+        <location filename="../mainwindow.cpp" line="1561"/>
         <source>Hints from the server log:</source>
         <translation>Підказки з журналу сервера:</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow.cpp" line="1518"/>
+        <location filename="../mainwindow.cpp" line="1547"/>
         <source>The server log has %n hint(s), see the Log tab</source>
         <translation>
             <numerusform>У журналі сервера %n підказка, див. вкладку «Журнал»</numerusform>
@@ -1463,83 +1463,143 @@ Model: %1
 <context>
     <name>MoeTuner</name>
     <message>
-        <location filename="../moetuner.cpp" line="38"/>
+        <location filename="../moetuner.cpp" line="42"/>
         <source>Find the Fastest MoE Split</source>
         <translation>Підбір найшвидшого розподілу MoE</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="43"/>
-        <source>Runs llama-bench with different numbers of expert layers kept on the CPU (--n-cpu-moe), starting with all %1 on the CPU and moving them to the GPU until it runs out of memory or generation gets slower. Each run loads the model, so this takes a few minutes.</source>
-        <translation>Запускає llama-bench з різною кількістю шарів експертів на CPU (--n-cpu-moe): спершу всі %1 на CPU, потім шари переносяться на GPU, доки не забракне пам&apos;яті або генерація не сповільниться. Кожен прогін завантажує модель, тож це займе кілька хвилин.</translation>
+        <location filename="../moetuner.cpp" line="47"/>
+        <source>Runs llama-bench with different numbers of expert layers kept on the CPU (--n-cpu-moe), starting with all %1 on the CPU and moving them to the GPU as long as the server, with its context size, still fits in GPU memory and generation does not get slower. Each run loads the model, so this takes a few minutes.</source>
+        <translation>Запускає llama-bench з різною кількістю шарів експертів на CPU (--n-cpu-moe): починає з усіх %1 на CPU і переносить їх на GPU, поки сервер разом зі своїм контекстом ще вміщується в пам&apos;ять GPU, а генерація не сповільнюється. Кожен запуск завантажує модель, тож це займе кілька хвилин.</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="49"/>
+        <location filename="../moetuner.cpp" line="54"/>
         <source>Layers on CPU</source>
         <translation>Шарів на CPU</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="49"/>
+        <location filename="../moetuner.cpp" line="54"/>
         <source>Prompt, tok/s</source>
         <translation>Промпт, ток/с</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="49"/>
+        <location filename="../moetuner.cpp" line="54"/>
+        <source>GPU memory, MiB</source>
+        <translation>Пам&apos;ять GPU, МіБ</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="55"/>
         <source>Generation, tok/s</source>
         <translation>Генерація, ток/с</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="65"/>
+        <location filename="../moetuner.cpp" line="57"/>
+        <source>What the server would use with its context size, estimated by llama-fit-params, and how much is free.</source>
+        <translation>Скільки використає сервер зі своїм розміром контексту (оцінка llama-fit-params) і скільки вільно.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="73"/>
         <source>Start</source>
         <translation>Почати</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="66"/>
-        <location filename="../moetuner.cpp" line="126"/>
+        <location filename="../moetuner.cpp" line="74"/>
+        <location filename="../moetuner.cpp" line="138"/>
         <source>Use</source>
         <translation>Використати</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="83"/>
+        <location filename="../moetuner.cpp" line="91"/>
         <source>Use %1</source>
         <translation>Використати %1</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="89"/>
+        <location filename="../moetuner.cpp" line="97"/>
         <source>Testing %1 layers on the CPU... %2 s</source>
         <translation>Перевірка: %1 шарів на CPU... %2 с</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="187"/>
+        <location filename="../moetuner.cpp" line="144"/>
+        <source>llama-fit-params was not found next to llama-server, so whether the server fits in GPU memory with its context size was not checked.</source>
+        <translation>llama-fit-params не знайдено поруч з llama-server, тож не перевірено, чи вміститься сервер зі своїм контекстом у пам&apos;ять GPU.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="150"/>
+        <source>Estimating GPU memory...</source>
+        <translation>Оцінка пам&apos;яті GPU...</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="176"/>
         <source>Could not run %1.</source>
         <translation>Не вдалося запустити %1.</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="192"/>
+        <location filename="../moetuner.cpp" line="196"/>
+        <source>llama-fit-params could not estimate GPU memory (%1), so whether the server fits with its context size was not checked.</source>
+        <translation>llama-fit-params не зміг оцінити пам&apos;ять GPU (%1), тож не перевірено, чи вміститься сервер зі своїм контекстом.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="201"/>
+        <source>Free GPU memory is unknown, so whether the server fits with its context size was not checked.</source>
+        <translation>Обсяг вільної пам&apos;яті GPU невідомий, тож не перевірено, чи вміститься сервер зі своїм контекстом.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="205"/>
+        <source>Even with all %1 expert layers on the CPU the server needs about %2 MiB of GPU memory, and %3 MiB is free. Use a smaller context, a quantized KV cache or keep the KV cache in RAM.</source>
+        <translation>Навіть з усіма %1 шарами експертів на CPU серверу потрібно близько %2 МіБ пам&apos;яті GPU, а вільно %3 МіБ. Зменште контекст, квантуйте KV-кеш або тримайте його в RAM.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="222"/>
+        <source>Estimating GPU memory with %1 layers on the CPU...</source>
+        <translation>Оцінка пам&apos;яті GPU з %1 шарами на CPU...</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="325"/>
         <source>Testing %1 layers on the CPU...</source>
         <translation>Перевірка: %1 шарів на CPU...</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="225"/>
+        <location filename="../moetuner.cpp" line="356"/>
         <source>%1 layers on the CPU failed: %2</source>
         <translation>%1 шарів на CPU — помилка: %2</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="244"/>
+        <location filename="../moetuner.cpp" line="375"/>
         <source>Run Again</source>
         <translation>Запустити знову</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="250"/>
+        <location filename="../moetuner.cpp" line="381"/>
         <source>No run succeeded. See whether llama-bench works with this model and device.</source>
         <translation>Жоден прогін не вдався. Перевірте, чи працює llama-bench з цією моделлю та пристроєм.</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="252"/>
-        <source>Fastest: %1 layers on the CPU, %2 tok/s. The server also needs GPU memory for the context (KV cache), which these short runs hardly use: if it does not load, use a slightly higher number.</source>
-        <translation>Найшвидше: %1 шарів на CPU, %2 ток/с. Серверу ще потрібна пам&apos;ять GPU для контексту (KV-кешу), якої ці короткі прогони майже не використовують: якщо модель не завантажиться, візьміть трохи більше число.</translation>
+        <location filename="../moetuner.cpp" line="383"/>
+        <source>Fastest: %1 layers on the CPU, %2 tok/s.</source>
+        <translation>Найшвидше: %1 шарів на CPU, %2 ток/с.</translation>
     </message>
     <message>
-        <location filename="../moetuner.cpp" line="275"/>
+        <location filename="../moetuner.cpp" line="386"/>
+        <source>If the server gets slower than in this test, its context does not fit next to the experts: use a higher number.</source>
+        <translation>Якщо сервер працюватиме повільніше, ніж у тесті, його контекст не вміщується поруч з експертами: візьміть більше число.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="389"/>
+        <source>Moving more expert layers to the GPU would not leave room for the context.</source>
+        <translation>Якщо перенести на GPU ще шари експертів, не залишиться місця для контексту.</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="412"/>
+        <source>%1 of %2</source>
+        <translation>%1 з %2</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="415"/>
+        <source>does not fit</source>
+        <translation>не вміщується</translation>
+    </message>
+    <message>
+        <location filename="../moetuner.cpp" line="415"/>
         <source>failed</source>
         <translation>помилка</translation>
     </message>
